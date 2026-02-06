@@ -1,0 +1,16 @@
+# Dependency directories
+node_modules/
+vendor/
+
+# Environment files (Keep these private!)
+.env
+.env.backup
+.pytest_cache
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build output
+/public/build
+/dist
