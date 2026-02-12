@@ -1,31 +1,36 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+
+// Auth Components
 import SignUp from "./components/SignUp";
-import VerificationPage from "./components/VerificationPage";
-import ResultPage from "./components/ResultPage";
 import Login from "./components/Login"; 
+
+// Organizer Components
 import OrganizerDash from "./components/OrganizerDash";
+import Events from "./components/Event"; 
+import EventManage from "./components/EventManage";
+import Speakers from "./components/Speakers";
+
+// Participant Components
 import ParticipantDash from "./components/ParticipantDash";
-import LandingPage from "./components/LandingPage";
-import Events from "./components/Event";
-import Role from "./components/Role";
-import Attendance from "./components/attendance";
-import QR from "./components/QR";
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<SignUp />} />
-        <Route path="/verify" element={<VerificationPage />} />
-        <Route path="/result" element={<ResultPage />} />
+        {/* --- Public / Auth Routes --- */}
+        {/* Redirect root to Login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+        
+        {/* --- Organizer Routes --- */}
         <Route path="/dashboard" element={<OrganizerDash />} />
-        <Route path="/participant" element={<ParticipantDash />} />
-        <Route path="/home" element={<LandingPage />} />
         <Route path="/events" element={<Events />} />
-        <Route path="/role" element={<Role />} />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/qr" element={<QR />} />
+        <Route path="/events/:id/manage" element={<EventManage />} />
+        <Route path="/speakers" element={<Speakers />} />
+
+        {/* --- Participant Routes --- */}
+        <Route path="/participant" element={<ParticipantDash />} />
       </Routes>
     </Router>
   );

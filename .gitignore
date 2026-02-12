@@ -1,6 +1,9 @@
 # Dependency directories
 node_modules/
 vendor/
+/vendor
+/node_modules
+.env
 
 # Environment files (Keep these private!)
 .env

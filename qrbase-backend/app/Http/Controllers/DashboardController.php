@@ -89,5 +89,18 @@ class DashboardController extends Controller
         return response()->json($reg);
     }
 
+    // Mark Attendance as Completed (Manual Admin Action)
+    public function markCompleted($id) {
+        $reg = \App\Models\Registration::findOrFail($id);
+        
+        // Optional: Check if they are 'Present' first
+        if ($reg->status !== 'Present') {
+            return response()->json(['message' => 'User must be PRESENT before completing.'], 400);
+        }
+
+        $reg->update(['status' => 'Completed']);
+        return response()->json(['message' => 'Attendance marked as COMPLETED', 'registration' => $reg]);
+    }
+
 
 }

@@ -9,22 +9,19 @@ class Registration extends Model
 {
     use HasFactory;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'event_id',
+        'user_id',
+        'status',      // <--- THIS IS CRITICAL for check-ins
+        'qr_token',    // <--- This is needed for secure QR codes
+        'feedback'     // If you store feedback summary here (optional)
+    ];
 
-    // RELATIONSHIPS
-
-    // A Registration belongs to one Event
     public function event() {
         return $this->belongsTo(Event::class);
     }
 
-    // A Registration belongs to one User (the participant)
     public function user() {
         return $this->belongsTo(User::class);
-    }
-
-    // Optional: A Registration has one Attendance record (if checked in)
-    public function attendance() {
-        return $this->hasOne(Attendance::class);
     }
 }
