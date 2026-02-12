@@ -13,7 +13,8 @@ class SpeakerController extends Controller
      * Get speakers ONLY for the logged-in organizer
      */
     public function index(Request $request) {
-    return Speaker::where('organizer_id', $request->user()->id)->latest()->get();    }
+        return Speaker::where('organizer_id', $request->user()->id)->latest()->get();
+    }
 
     /**
      * Create a new speaker
@@ -88,10 +89,14 @@ class SpeakerController extends Controller
         if ($request->filled('event_id')) {
             $event = Event::where('organizer_id', $request->user()->id)->find($request->event_id);
             if ($event) {
-                // Syncs the topic specifically for this event-speaker pair
-                $event->speakers()->updateExistingPivot($speaker->id, [
-                    'topic' => $request->topic ?? 'TBA'
-                ]);
+                // Check if attached, if not attach, if yes update pivot
+                if (!$event->speakers()->where('speaker_id', $speaker->id)->exists()) {
+                    $event->speakers()->attach($speaker->id, ['topic' => $request->topic ?? 'TBA']);
+                } else {
+                    $event->speakers()->updateExistingPivot($speaker->id, [
+                        'topic' => $request->topic ?? 'TBA'
+                    ]);
+                }
             }
         }
 
@@ -105,7 +110,7 @@ class SpeakerController extends Controller
         $speaker = Speaker::where('organizer_id', $request->user()->id)->findOrFail($id);
 
         if ($speaker->photo_path) Storage::disk('public')->delete($speaker->photo_path);
-        $speaker->events()->detach();
+        // Deleting the speaker automatically removes them from the pivot table (event_speaker)
         $speaker->delete();
 
         return response()->json(['message' => 'Speaker removed']);

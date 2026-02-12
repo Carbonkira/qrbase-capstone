@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class EventController extends Controller
 {
-public function index(Request $request) {
+    public function index(Request $request) {
         return Event::with('speakers')
             // Count total registrations (Booked)
             ->withCount('registrations') 
@@ -61,7 +61,7 @@ public function index(Request $request) {
         return response()->json(['message' => 'Event created!', 'event' => $event], 201);
     }
 
-    // --- 2. UPDATE (FIXED: Ensure ownership) ---
+    // --- 2. UPDATE ---
     public function update(Request $request, $id) {
         // Only find event if it belongs to this user
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
@@ -90,7 +90,7 @@ public function index(Request $request) {
         return response()->json(['message' => 'Event updated!', 'event' => $event]);
     }
 
-    // --- 3. DELETE (FIXED: Ensure ownership) ---
+    // --- 3. DELETE ---
     public function destroy(Request $request, $id) {
         // Only find event if it belongs to this user
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
@@ -100,14 +100,14 @@ public function index(Request $request) {
         return response()->json(['message' => 'Event deleted']);
     }
 
-    // --- 4. MODULE DATA (FIXED: Ensure ownership) ---
+    // --- 4. MODULE DATA (FIXED to return available_speakers) ---
     public function getEventModuleData(Request $request, $id) {
         // Only allow viewing if you are the organizer
         $event = Event::with(['registrations.user', 'speakers'])
             ->withCount(['registrations as present_count' => function($q){
                 $q->where('status', 'Present');
             }])
-            ->where('organizer_id', $request->user()->id) // <--- CRITICAL FIX
+            ->where('organizer_id', $request->user()->id)
             ->findOrFail($id);
 
         $form = DB::table('event_feedback_forms')->where('event_id', $id)->first();
@@ -123,6 +123,9 @@ public function index(Request $request) {
         });
 
         $feedbackCount = $feedbackResponses->count();
+
+        // FETCH GLOBAL ROSTER for "Add Existing" dropdown
+        $allSpeakers = Speaker::where('organizer_id', $request->user()->id)->get();
         
         return response()->json([
             'event' => $event,
@@ -133,7 +136,8 @@ public function index(Request $request) {
                 'capacity' => $event->max_participants
             ],
             'attendees' => $event->registrations, 
-            'speakers' => $event->speakers,
+            'speakers' => $event->speakers, // Speakers specifically attached to this event
+            'available_speakers' => $allSpeakers, // All speakers owned by user (for selection)
             'feedback_form' => $form
         ]);
     }
@@ -147,15 +151,12 @@ public function index(Request $request) {
             'registrations' => DB::table('registrations')->whereIn('event_id', $eventIds)->count(),
             'checked_in' => DB::table('registrations')->whereIn('event_id', $eventIds)->where('status', 'Present')->count(),
             'total_events' => $eventIds->count(),
-            'speakers' => \App\Models\Speaker::count() 
+            'speakers' => Speaker::where('organizer_id', $organizerId)->count() 
         ]);
     }
 
-    
-
     // ORGANIZER: Save Feedback Form
     public function saveFeedbackForm(Request $request, $id) {
-        // Verify ownership first
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
 
         $request->validate(['questions' => 'required']); 
@@ -178,7 +179,7 @@ public function index(Request $request) {
         
         $form = DB::table('event_feedback_forms')
             ->where('event_id', $id)
-            ->where('is_active', true) // Only show if active
+            ->where('is_active', true)
             ->first();
 
         if (!$form) {
@@ -194,7 +195,6 @@ public function index(Request $request) {
 
     // PARTICIPANT: Submit Feedback
     public function submitFeedback(Request $request, $id) {
-        // Check if already submitted
         $existing = DB::table('feedback_responses')
             ->where('event_id', $id)
             ->where('user_id', $request->user()->id)

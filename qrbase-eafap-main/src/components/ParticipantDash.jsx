@@ -139,7 +139,7 @@ const ParticipantDash = () => {
                                 <span className="text-xs font-black text-slate-700 uppercase">{ticket.event.organizer ? `${ticket.event.organizer.first_name} ${ticket.event.organizer.last_name}` : "Unknown"}</span>
                             </div>
 
-                            {/* --- NEW: SHOW SPEAKERS & TOPICS ON CARD --- */}
+                            {/* SHOW SPEAKERS & TOPICS ON CARD */}
                             {ticket.event.speakers && ticket.event.speakers.length > 0 && (
                                 <div className="flex items-start gap-2 mt-1">
                                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest min-w-[80px] mt-0.5">Speakers:</span>
@@ -147,7 +147,8 @@ const ParticipantDash = () => {
                                         {ticket.event.speakers.map(s => (
                                             <div key={s.id} className="flex flex-col">
                                                 <span className="text-xs font-black text-slate-700 uppercase leading-none">{s.name}</span>
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{s.topic || "Topic TBA"}</span>
+                                                {/* FIX: Access topic via pivot */}
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{s.pivot?.topic || s.topic || "Topic TBA"}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -225,7 +226,8 @@ const ParticipantDash = () => {
                                 {selectedEvent.event.speakers && selectedEvent.event.speakers.map(s => (
                                     <div key={s.id} className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
                                         <span className="text-xs font-black text-slate-700 uppercase block">{s.name}</span>
-                                        <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">{s.topic || "Topic TBA"}</span>
+                                        {/* FIX: Access topic via pivot */}
+                                        <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider">{s.pivot?.topic || s.topic || "Topic TBA"}</span>
                                     </div>
                                 ))}
                             </div>
@@ -253,8 +255,8 @@ const ParticipantDash = () => {
                                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black text-sm">{s.name.charAt(0)}</div>
                                     <div>
                                         <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">{s.name}</h4>
-                                        {/* SHOW TOPIC IN EVALUATION FORM */}
-                                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Topic: {s.topic || "General"}</p>
+                                        {/* FIX: Access topic via pivot for Feedback Form */}
+                                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Topic: {s.pivot?.topic || s.topic || "General"}</p>
                                     </div>
                                 </div>
                                 {speakerQuestions.map((q, idx) => (

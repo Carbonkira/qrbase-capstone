@@ -10,7 +10,8 @@ const STORAGE_URL = "http://localhost:8000/storage/";
 
 const Speakers = () => {
   const navigate = useNavigate();
-  // 1. FIXED: Initialize from LocalStorage
+  
+  // --- USER STATE ---
   const [user, setUser] = useState(() => {
       const savedUser = localStorage.getItem('user');
       return savedUser ? JSON.parse(savedUser) : null;
@@ -19,16 +20,25 @@ const Speakers = () => {
   const [speakers, setSpeakers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // States
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  // --- MODAL STATES ---
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false); // Renamed for clarity
+  const [editingId, setEditingId] = useState(null); // Track which ID we are editing
   const [selectedSpeaker, setSelectedSpeaker] = useState(null); 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // --- FORMS ---
   const [profileData, setProfileData] = useState({ 
       first_name: user?.first_name || '', 
       last_name: user?.last_name || '' 
   });
 
-  const [formData, setFormData] = useState({ name: "", specialization: "", description: "", contact_email: "", photo: null });
+  const [formData, setFormData] = useState({ 
+      name: "", 
+      specialization: "", 
+      description: "", 
+      contact_email: "", 
+      photo: null 
+  });
 
   useEffect(() => { fetchUser(); fetchSpeakers(); }, []);
 
@@ -41,7 +51,10 @@ const Speakers = () => {
       } catch (err) { console.error("Failed to load profile"); }
   };
 
-  const fetchSpeakers = async () => { try { const res = await api.get('/all-speakers'); setSpeakers(res.data); } catch (err) { console.error(err); } };
+  const fetchSpeakers = async () => { 
+      try { const res = await api.get('/all-speakers'); setSpeakers(res.data); } 
+      catch (err) { console.error(err); } 
+  };
 
   const handleUpdateProfile = async (e) => {
       e.preventDefault();
@@ -54,9 +67,34 @@ const Speakers = () => {
       } catch (err) { alert("Failed to update profile."); }
   };
 
-  const handleAddSpeaker = async (e) => {
+  // --- SPEAKER ACTIONS ---
+
+  // 1. OPEN CREATE MODAL
+  const openCreateModal = () => {
+      setEditingId(null);
+      setFormData({ name: "", specialization: "", description: "", contact_email: "", photo: null });
+      setIsFormModalOpen(true);
+  };
+
+  // 2. OPEN EDIT MODAL (Pre-fill Data)
+  const openEditModal = (speaker) => {
+      setEditingId(speaker.id);
+      setFormData({ 
+          name: speaker.name, 
+          specialization: speaker.specialization, 
+          description: speaker.description || "", 
+          contact_email: speaker.contact_email || "", 
+          photo: null // Keep null unless changing
+      });
+      setSelectedSpeaker(null); // Close detail view
+      setIsFormModalOpen(true); // Open form view
+  };
+
+  // 3. HANDLE SAVE (Create or Update)
+  const handleSaveSpeaker = async (e) => {
     e.preventDefault();
     if (!formData.name) return alert("Name is required");
+
     const data = new FormData();
     data.append('name', formData.name);
     data.append('specialization', formData.specialization);
@@ -65,17 +103,31 @@ const Speakers = () => {
     if (formData.photo) data.append('photo', formData.photo);
 
     try {
-        await api.post('/speakers', data, { headers: { 'Content-Type': 'multipart/form-data' } });
-        alert("Speaker Added!");
-        setIsAddModalOpen(false);
+        if (editingId) {
+            // UPDATE: Spoof PUT method for FormData support in Laravel
+            data.append('_method', 'PUT');
+            await api.post(`/speakers/${editingId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
+            alert("Speaker Updated!");
+        } else {
+            // CREATE
+            await api.post('/speakers', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+            alert("Speaker Added!");
+        }
+
+        setIsFormModalOpen(false);
+        setEditingId(null);
         setFormData({ name: "", specialization: "", description: "", contact_email: "", photo: null });
         fetchSpeakers(); 
-    } catch (err) { alert(err.response?.data?.message || "Failed to add speaker"); }
+    } catch (err) { alert(err.response?.data?.message || "Operation failed"); }
   };
 
   const handleDelete = async (id) => {
     if(!window.confirm("Remove this speaker from the global roster?")) return;
-    try { await api.delete(`/speakers/${id}`); setSpeakers(speakers.filter(s => s.id !== id)); if(selectedSpeaker?.id === id) setSelectedSpeaker(null); } catch (err) { alert("Failed to remove speaker."); }
+    try { 
+        await api.delete(`/speakers/${id}`); 
+        setSpeakers(speakers.filter(s => s.id !== id)); 
+        if(selectedSpeaker?.id === id) setSelectedSpeaker(null); 
+    } catch (err) { alert("Failed to remove speaker."); }
   };
 
   const filteredSpeakers = speakers.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.specialization?.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -89,15 +141,17 @@ const Speakers = () => {
   return (
     <div className="h-screen flex flex-col bg-[#e9eff6] font-sans text-slate-800 overflow-hidden relative">
       
-      {/* MODALS */}
-      {isAddModalOpen && (
+      {/* --- FORM MODAL (CREATE & EDIT) --- */}
+      {isFormModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
             <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10 animate-in zoom-in duration-200">
                 <div className="flex justify-between items-center mb-8">
-                    <h3 className="text-3xl font-black text-[#1e40af] uppercase">New Speaker</h3>
-                    <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-red-500"><Icon path="M6 18L18 6M6 6l12 12" /></button>
+                    <h3 className="text-3xl font-black text-[#1e40af] uppercase">
+                        {editingId ? "Edit Speaker" : "New Speaker"}
+                    </h3>
+                    <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-red-500"><Icon path="M6 18L18 6M6 6l12 12" /></button>
                 </div>
-                <form onSubmit={handleAddSpeaker} className="flex flex-col gap-5">
+                <form onSubmit={handleSaveSpeaker} className="flex flex-col gap-5">
                     <div className="flex gap-4">
                         <input placeholder="Full Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="flex-1 bg-[#f1f5f9] p-5 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 border-2 border-transparent" />
                         <input placeholder="Role" value={formData.specialization} onChange={e => setFormData({...formData, specialization: e.target.value})} className="flex-1 bg-[#f1f5f9] p-5 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 border-2 border-transparent" />
@@ -105,17 +159,29 @@ const Speakers = () => {
                     <input placeholder="Contact Email (Optional)" value={formData.contact_email} onChange={e => setFormData({...formData, contact_email: e.target.value})} className="w-full bg-[#f1f5f9] p-5 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 border-2 border-transparent" />
                     <textarea placeholder="Bio / Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-[#f1f5f9] p-5 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 border-2 border-transparent h-36 resize-none" />
                     <div className="flex flex-col gap-2"><label className="text-xs font-black text-slate-400 uppercase ml-1">Photo</label><input type="file" onChange={e => setFormData({...formData, photo: e.target.files[0]})} className="text-sm font-bold text-slate-500" /></div>
-                    <button type="submit" className="bg-[#1e293b] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 transition-all mt-2">Save Speaker</button>
+                    
+                    <button type="submit" className="bg-[#1e293b] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 transition-all mt-2">
+                        {editingId ? "Update Speaker" : "Save Speaker"}
+                    </button>
                 </form>
             </div>
         </div>
       )}
 
+      {/* --- DETAILS MODAL --- */}
       {selectedSpeaker && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
             <div className="bg-white w-full max-w-md rounded-[3rem] shadow-2xl p-12 animate-in zoom-in duration-200 relative">
+                {/* CLOSE BUTTON */}
                 <button onClick={() => setSelectedSpeaker(null)} className="absolute top-8 right-8 text-slate-300 hover:text-red-500"><Icon path="M6 18L18 6M6 6l12 12" /></button>
-                <div className="flex flex-col items-center text-center">
+                
+                {/* EDIT BUTTON (NEW) */}
+                <button onClick={() => openEditModal(selectedSpeaker)} className="absolute top-8 left-8 text-blue-300 hover:text-blue-600 flex gap-2 items-center group">
+                    <Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                    <span className="text-xs font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Edit</span>
+                </button>
+
+                <div className="flex flex-col items-center text-center mt-6">
                     <div className="w-48 h-48 bg-slate-100 rounded-full mb-8 overflow-hidden border-4 border-white shadow-lg">
                         {selectedSpeaker.photo_path ? <img src={STORAGE_URL + selectedSpeaker.photo_path} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-6xl">{selectedSpeaker.name.charAt(0)}</div>}
                     </div>
@@ -176,7 +242,7 @@ const Speakers = () => {
             <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
                 <div><h2 className="text-4xl font-black text-[#1e40af] tracking-tight uppercase leading-none">Speakers</h2><span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Global Roster</span></div>
                 <div className="flex gap-4 w-full md:w-auto">
-                    <button onClick={() => setIsAddModalOpen(true)} className="bg-[#1e293b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 shadow-lg transition-all active:scale-95 whitespace-nowrap">+ Add Speaker</button>
+                    <button onClick={openCreateModal} className="bg-[#1e293b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-600 shadow-lg transition-all active:scale-95 whitespace-nowrap">+ Add Speaker</button>
                     <div className="relative w-full md:w-80">
                         <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-blue-500"><Icon path="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" className="w-5 h-5" /></div>
                         <input type="text" placeholder="SEARCH SPEAKER..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border-2 border-slate-100 rounded-2xl py-4 pl-14 pr-4 text-sm font-black uppercase tracking-widest outline-none focus:border-[#2563eb] shadow-sm transition-all" />

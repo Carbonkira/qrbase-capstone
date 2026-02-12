@@ -30,6 +30,11 @@ const EventManage = () => {
       name: '', specialization: '', topic: '', contact_email: '', description: '', photo: null 
   });
 
+  // NEW: Add Mode (Existing vs New) & Global Roster
+  const [addMode, setAddMode] = useState('existing'); 
+  const [selectedExistingId, setSelectedExistingId] = useState('');
+  const [availableSpeakers, setAvailableSpeakers] = useState([]);
+
   const [evalConfig, setEvalConfig] = useState({ global: [], speakers: {} });
   const [isFormLocked, setIsFormLocked] = useState(false); 
 
@@ -60,6 +65,9 @@ const EventManage = () => {
         const res = await api.get(`/events/${id}/module`);
         setData(res.data);
         
+        // Store the global roster for the dropdown
+        setAvailableSpeakers(res.data.available_speakers || []);
+
         // Parse Evaluation Form
         if (res.data.feedback_form && res.data.feedback_form.questions) {
             try {
@@ -85,27 +93,56 @@ const EventManage = () => {
 
   // --- SPEAKER ACTIONS ---
 
-  // 1. POPULATE FORM FOR EDITING
+  // 1. POPULATE FORM FOR EDITING (Focus on Topic)
   const handleEditSpeaker = (s, e) => {
       e.stopPropagation();
       setSpeakerForm({
           id: s.id, // ID triggers "Update" mode
           name: s.name,
           specialization: s.specialization,
-          // CRITICAL: Get topic from pivot if available (event specific), else fallback
           topic: s.pivot?.topic || s.topic || '', 
           contact_email: s.contact_email || '',
           description: s.description || '',
           photo: null
       });
-      // Scroll to form
+      // Force "new" mode view so the form fields appear
+      setAddMode('new');
       document.getElementById('speaker-form-container')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const cancelEditSpeaker = () => {
       setSpeakerForm({ id: null, name: '', specialization: '', topic: '', contact_email: '', description: '', photo: null });
+      setSelectedExistingId('');
   };
 
+  // 2. ATTACH EXISTING SPEAKER
+  const handleAttachExisting = async () => {
+    if(!selectedExistingId) return alert("Select a speaker first");
+    
+    // Find original data to satisfy "required" fields in backend validation
+    const speakerToAttach = availableSpeakers.find(s => s.id == selectedExistingId);
+    if(!speakerToAttach) return;
+
+    const formData = new FormData();
+    formData.append('event_id', id);
+    formData.append('topic', speakerForm.topic || 'Guest Speaker');
+    
+    // We must re-send basic info to pass validation in SpeakerController::update
+    formData.append('name', speakerToAttach.name);
+    formData.append('specialization', speakerToAttach.specialization);
+    
+    // Method spoofing for PUT
+    formData.append('_method', 'PUT'); 
+
+    try {
+        await api.post(`/speakers/${selectedExistingId}`, formData);
+        alert("Speaker Attached!");
+        cancelEditSpeaker();
+        fetchData();
+    } catch (err) { alert("Failed to attach."); }
+  };
+
+  // 3. CREATE NEW OR UPDATE EXISTING
   const handleSaveSpeaker = async () => {
       if (!speakerForm.name) return alert("Name is required");
 
@@ -120,7 +157,7 @@ const EventManage = () => {
 
       try {
         if (speakerForm.id) {
-            // UPDATE EXISTING (Uses PUT method spoofing for FormData)
+            // UPDATE EXISTING
             formData.append('_method', 'PUT'); 
             await api.post(`/speakers/${speakerForm.id}`, formData, { headers: {'Content-Type': 'multipart/form-data'} });
             alert("Speaker Updated!");
@@ -246,41 +283,75 @@ const EventManage = () => {
                 </div>
             )}
 
-            {/* SPEAKERS TAB */}
+            {/* SPEAKERS TAB (UPDATED) */}
             {activeTab === 'Speakers' && (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                 {/* FORM */}
+                 
+                 {/* LEFT COLUMN: ACTIONS & FORM */}
                  <div id="speaker-form-container" className={`bg-white rounded-[3rem] shadow-xl p-10 h-fit border-2 ${speakerForm.id ? 'border-blue-200 bg-blue-50/50' : 'border-slate-50'}`}>
                      <div className="flex justify-between items-center mb-6">
-                         <h3 className="font-black text-xl text-[#1e40af] uppercase">{speakerForm.id ? "Edit Speaker" : "Add Event Speaker"}</h3>
-                         {speakerForm.id && <button onClick={cancelEditSpeaker} className="text-xs font-bold text-red-400 hover:text-red-600 uppercase tracking-widest">Cancel</button>}
+                         <h3 className="font-black text-xl text-[#1e40af] uppercase">Manage Speakers</h3>
                      </div>
+
+                     {/* TOGGLE TABS */}
+                     <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+                        <button onClick={() => { setAddMode('existing'); cancelEditSpeaker(); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${addMode === 'existing' && !speakerForm.id ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>Select Existing</button>
+                        <button onClick={() => { setAddMode('new'); cancelEditSpeaker(); }} className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${addMode === 'new' || speakerForm.id ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>Create / Edit</button>
+                     </div>
+
                      <div className="flex flex-col gap-4">
-                         <input placeholder="Name" value={speakerForm.name} onChange={e => setSpeakerForm({...speakerForm, name: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 shadow-sm" />
-                         <input placeholder="Role / Title" value={speakerForm.specialization} onChange={e => setSpeakerForm({...speakerForm, specialization: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 shadow-sm" />
                          
-                         <div className="flex flex-col gap-1">
-                             <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Topic / Session Title</label>
-                             <input placeholder="e.g. The Future of AI" value={speakerForm.topic} onChange={e => setSpeakerForm({...speakerForm, topic: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-blue-200 focus:border-blue-500 shadow-sm" />
-                         </div>
-                         
-                         <input placeholder="Contact Email" value={speakerForm.contact_email} onChange={e => setSpeakerForm({...speakerForm, contact_email: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 shadow-sm" />
-                         <textarea placeholder="Description" value={speakerForm.description} onChange={e => setSpeakerForm({...speakerForm, description: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 h-28 resize-none shadow-sm" />
-                         <input type="file" onChange={e => setSpeakerForm({...speakerForm, photo: e.target.files[0]})} className="text-xs font-bold text-slate-500" />
-                         
-                         <button onClick={handleSaveSpeaker} className={`py-4 rounded-2xl font-black text-sm uppercase tracking-widest mt-2 shadow-lg transition-all active:scale-95 ${speakerForm.id ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-[#1e293b] text-white hover:bg-black'}`}>
-                             {speakerForm.id ? "Update Speaker" : "Add to Event"}
-                         </button>
+                         {/* MODE 1: ATTACH EXISTING */}
+                         {addMode === 'existing' && !speakerForm.id && (
+                            <>
+                                <select value={selectedExistingId} onChange={(e) => setSelectedExistingId(e.target.value)} className="bg-slate-50 p-4 rounded-2xl text-sm font-bold outline-none border-2 border-slate-100 focus:border-blue-500">
+                                    <option value="">-- Select From Roster --</option>
+                                    {availableSpeakers
+                                        .filter(s => !speakers.find(evS => evS.id === s.id)) // Hide if already attached
+                                        .map(s => <option key={s.id} value={s.id}>{s.name} - {s.specialization}</option>)
+                                    }
+                                </select>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Topic for this Event</label>
+                                    <input placeholder="e.g. Opening Remarks" value={speakerForm.topic} onChange={e => setSpeakerForm({...speakerForm, topic: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-blue-100 focus:border-blue-500 shadow-sm" />
+                                </div>
+                                <button onClick={handleAttachExisting} className="bg-[#1e293b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest mt-2 hover:bg-blue-600 shadow-lg transition-all active:scale-95">Attach Speaker</button>
+                            </>
+                         )}
+
+                         {/* MODE 2: CREATE NEW / EDIT */}
+                         {(addMode === 'new' || speakerForm.id) && (
+                            <>
+                                {speakerForm.id && <div className="flex justify-between items-center bg-blue-100 p-3 rounded-xl mb-2"><span className="text-[10px] font-black text-blue-600 uppercase">Editing: {speakerForm.name}</span><button onClick={cancelEditSpeaker} className="text-[10px] font-bold text-red-500 uppercase">Cancel</button></div>}
+                                
+                                <input placeholder="Name" value={speakerForm.name} onChange={e => setSpeakerForm({...speakerForm, name: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 shadow-sm" />
+                                <input placeholder="Role / Title" value={speakerForm.specialization} onChange={e => setSpeakerForm({...speakerForm, specialization: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 shadow-sm" />
+                                
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Topic / Session Title</label>
+                                    <input placeholder="e.g. The Future of AI" value={speakerForm.topic} onChange={e => setSpeakerForm({...speakerForm, topic: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-blue-200 focus:border-blue-500 shadow-sm" />
+                                </div>
+                                
+                                <input placeholder="Contact Email" value={speakerForm.contact_email} onChange={e => setSpeakerForm({...speakerForm, contact_email: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 shadow-sm" />
+                                <textarea placeholder="Description" value={speakerForm.description} onChange={e => setSpeakerForm({...speakerForm, description: e.target.value})} className="bg-white p-4 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 h-28 resize-none shadow-sm" />
+                                <input type="file" onChange={e => setSpeakerForm({...speakerForm, photo: e.target.files[0]})} className="text-xs font-bold text-slate-500" />
+                                
+                                <button onClick={handleSaveSpeaker} className={`py-4 rounded-2xl font-black text-sm uppercase tracking-widest mt-2 shadow-lg transition-all active:scale-95 ${speakerForm.id ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-[#1e293b] text-white hover:bg-black'}`}>
+                                    {speakerForm.id ? "Update Speaker" : "Create & Add"}
+                                </button>
+                            </>
+                         )}
                      </div>
                  </div>
 
-                 {/* LIST */}
-                 <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                 {/* RIGHT COLUMN: LIST */}
+                 <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 h-fit">
+                     {speakers.length === 0 && <div className="col-span-2 text-center text-slate-300 font-bold uppercase py-10">No speakers attached.</div>}
                      {speakers.map(s => (
                          <div key={s.id} onClick={() => setSelectedSpeaker(s)} className={`bg-white p-8 rounded-[3rem] shadow-lg flex gap-6 items-center border relative group cursor-pointer transition-all ${speakerForm.id === s.id ? 'border-blue-400 ring-4 ring-blue-100' : 'border-slate-50 hover:border-blue-200'}`}>
                              <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => handleEditSpeaker(s, e)} className="text-blue-300 hover:text-blue-600 bg-blue-50 p-2 rounded-lg"><Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className="w-4 h-4" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); handleDeleteSpeaker(s.id); }} className="text-red-300 hover:text-red-600 bg-red-50 p-2 rounded-lg"><Icon path="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" className="w-4 h-4" /></button>
+                                <button onClick={(e) => handleEditSpeaker(s, e)} className="text-blue-300 hover:text-blue-600 bg-blue-50 p-2 rounded-lg" title="Edit Topic / Details"><Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" className="w-4 h-4" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteSpeaker(s.id); }} className="text-red-300 hover:text-red-600 bg-red-50 p-2 rounded-lg" title="Remove from Event"><Icon path="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" className="w-4 h-4" /></button>
                              </div>
                              <div className="w-20 h-20 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-blue-500 font-black text-2xl">
                                 {s.photo_path ? <img src={STORAGE_URL + s.photo_path} alt={s.name} className="w-full h-full object-cover" /> : s.name.charAt(0)}
@@ -454,7 +525,6 @@ const EventManage = () => {
                     </div>
                 </div>
             )}
-            {/* I've included the critical logic above. The rest of the file (modals, scanner, evaluation tab) remains identical to the previous version to keep this response concise. */}
             
             {/* EDIT PROFILE MODAL */}
             {isProfileOpen && (

@@ -10,6 +10,7 @@ class Speaker extends Model
     use HasFactory;
 
     protected $fillable = [
+        'organizer_id',
         'name',
         'specialization',
         'contact_email',
@@ -19,6 +20,8 @@ class Speaker extends Model
 
     public function events()
     {
-        return $this->belongsToMany(Event::class, 'event_speaker');
+        return $this->belongsToMany(Event::class, 'event_speaker')
+                    ->withPivot('topic')
+                    ->withTimestamps();
     }
 }
