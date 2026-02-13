@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SpeakerController;
+use App\Http\Controllers\UserController; 
 
 /*
 |--------------------------------------------------------------------------
@@ -20,11 +21,14 @@ Route::post('/login', [AuthController::class, 'login']);
 // --- PROTECTED ---
 Route::middleware('auth:sanctum')->group(function () {
 
-    // USER
-    Route::get('/user', [AuthController::class, 'user']);
-    Route::put('/user/profile', [AuthController::class, 'updateProfile']);
+    // AUTH (Logout remains here)
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // USER (Profile Management - Moved to UserController)
+    Route::get('/user', [UserController::class, 'index']);
+    Route::put('/user/profile', [UserController::class, 'updateProfile']);
+    Route::put('/user/password', [UserController::class, 'changePassword']);
+    
     // DASHBOARD & EVENTS
     Route::get('/dashboard-stats', [EventController::class, 'dashboardStats']);
     Route::get('/events', [EventController::class, 'index']); 
@@ -34,10 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/events/{id}/module', [EventController::class, 'getEventModuleData']); 
     Route::get('/events/{id}/export', [RegistrationController::class, 'exportAttendance']); 
 
-    // SPEAKERS (Global & Event Specific)
+    // SPEAKERS
     Route::get('/all-speakers', [SpeakerController::class, 'index']); 
     Route::post('/speakers', [SpeakerController::class, 'store']); 
-    // *** THIS IS THE MISSING LINE FIXING YOUR ERROR ***
     Route::put('/speakers/{id}', [SpeakerController::class, 'update']); 
     Route::delete('/speakers/{id}', [SpeakerController::class, 'destroy']); 
 
@@ -46,6 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my-tickets', [RegistrationController::class, 'myTickets']); 
     Route::post('/events/{id}/scan', [RegistrationController::class, 'scan']); 
     Route::put('/attendance-requests/{id}', [RegistrationController::class, 'updateStatus']); 
+
+    // WALKINS (Make sure this route exists for the modal to work!)
+    Route::post('/events/{id}/walk-in', [RegistrationController::class, 'registerWalkIn']);
 
     // FEEDBACK
     Route::post('/events/{id}/feedback-form', [EventController::class, 'saveFeedbackForm']); 

@@ -32,17 +32,23 @@ const OrganizerDash = () => {
   const navigate = useNavigate();
   const location = useLocation(); 
   
-  // 1. FIXED: Initialize from LocalStorage
+  // 1. Initialize from LocalStorage
   const [user, setUser] = useState(() => {
       const savedUser = localStorage.getItem('user');
       return savedUser ? JSON.parse(savedUser) : null;
   });
   
-  // Profile Edit State
+  // 2. Profile & Password State (INSIDE COMPONENT NOW)
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isPasswordMode, setIsPasswordMode] = useState(false);
   const [profileData, setProfileData] = useState({ 
       first_name: user?.first_name || '', 
       last_name: user?.last_name || '' 
+  });
+  const [passwordData, setPasswordData] = useState({ 
+      current_password: '', 
+      new_password: '', 
+      new_password_confirmation: '' 
   });
 
   const [statsData, setStatsData] = useState({ registrations: 0, checked_in: 0, total_events: 0, speakers: 0 });
@@ -60,7 +66,7 @@ const OrganizerDash = () => {
       try { 
           const res = await api.get('/user'); 
           setUser(res.data); 
-          localStorage.setItem('user', JSON.stringify(res.data)); // Sync
+          localStorage.setItem('user', JSON.stringify(res.data)); 
           setProfileData({ 
             first_name: res.data.first_name || '', 
             last_name: res.data.last_name || '' 
@@ -79,6 +85,21 @@ const OrganizerDash = () => {
           setIsProfileOpen(false);
           alert("Profile updated!");
       } catch (err) { alert("Failed to update profile."); }
+  };
+
+  const handleChangePassword = async (e) => {
+      e.preventDefault();
+      if (passwordData.new_password !== passwordData.new_password_confirmation) {
+          return alert("New passwords do not match!");
+      }
+      try {
+          await api.put('/user/password', passwordData);
+          alert("Password changed successfully!");
+          setIsPasswordMode(false); 
+          setPasswordData({ current_password: '', new_password: '', new_password_confirmation: '' });
+      } catch (err) {
+          alert(err.response?.data?.message || "Failed to change password.");
+      }
   };
 
   const handleLogout = () => { localStorage.clear(); navigate('/login'); };
@@ -101,7 +122,6 @@ const OrganizerDash = () => {
             <div className="flex items-center gap-4">
                 <div className="text-right hidden sm:block">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Organizer</p>
-                    {/* VISIBLE EDIT TRIGGER */}
                     <div onClick={() => setIsProfileOpen(true)} className="flex items-center gap-2 cursor-pointer group">
                         <p className="text-lg font-black text-[#1e40af] uppercase leading-none group-hover:text-blue-600 transition-colors">
                             {user.first_name} {user.last_name}
@@ -143,19 +163,83 @@ const OrganizerDash = () => {
         </main>
       </div>
 
-      {/* EDIT PROFILE MODAL */}
+      {/* UNIFIED PROFILE & PASSWORD MODAL */}
       {isProfileOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in">
-                <h3 className="text-2xl font-black text-[#1e40af] uppercase mb-6 text-center">Edit Profile</h3>
-                <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
-                    <input placeholder="First Name" value={profileData.first_name} onChange={(e) => setProfileData({...profileData, first_name: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
-                    <input placeholder="Last Name" value={profileData.last_name} onChange={(e) => setProfileData({...profileData, last_name: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
-                    <div className="flex gap-2 mt-4">
-                        <button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
-                        <button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600">Save</button>
-                    </div>
-                </form>
+            <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 animate-in zoom-in">
+                
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-2xl font-black text-[#1e40af] uppercase text-center flex-1">
+                        {isPasswordMode ? "Change Password" : "Edit Profile"}
+                    </h3>
+                </div>
+
+                {/* TOGGLE TABS */}
+                <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+                    <button 
+                        onClick={() => setIsPasswordMode(false)} 
+                        className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${!isPasswordMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Profile
+                    </button>
+                    <button 
+                        onClick={() => setIsPasswordMode(true)} 
+                        className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${isPasswordMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Security
+                    </button>
+                </div>
+
+                {isPasswordMode ? (
+                    // --- PASSWORD FORM ---
+                    <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+                        <input 
+                            type="password" 
+                            placeholder="Current Password" 
+                            value={passwordData.current_password} 
+                            onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            type="password" 
+                            placeholder="New Password" 
+                            value={passwordData.new_password} 
+                            onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            type="password" 
+                            placeholder="Confirm New Password" 
+                            value={passwordData.new_password_confirmation} 
+                            onChange={(e) => setPasswordData({...passwordData, new_password_confirmation: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+                            <button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600">Update</button>
+                        </div>
+                    </form>
+                ) : (
+                    // --- PROFILE FORM ---
+                    <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
+                        <input 
+                            placeholder="First Name" 
+                            value={profileData.first_name} 
+                            onChange={(e) => setProfileData({...profileData, first_name: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            placeholder="Last Name" 
+                            value={profileData.last_name} 
+                            onChange={(e) => setProfileData({...profileData, last_name: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+                            <button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600">Save</button>
+                        </div>
+                    </form>
+                )}
             </div>
         </div>
       )}

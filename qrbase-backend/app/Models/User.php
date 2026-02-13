@@ -6,11 +6,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens; // <--- Import Sanctum
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable; // <--- Add HasApiTokens here
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -22,7 +22,7 @@ class User extends Authenticatable
         'last_name',
         'email',
         'password',
-        'role', // 'organizer' or 'participant'
+        'role', 
     ];
 
     /**
@@ -35,11 +35,6 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -48,14 +43,10 @@ class User extends Authenticatable
         ];
     }
 
-    // RELATIONSHIPS
-
-    // A User (Organizer) can create many Events
     public function events() {
         return $this->hasMany(Event::class, 'organizer_id');
     }
 
-    // A User (Participant) can have many Registrations
     public function registrations() {
         return $this->hasMany(Registration::class);
     }

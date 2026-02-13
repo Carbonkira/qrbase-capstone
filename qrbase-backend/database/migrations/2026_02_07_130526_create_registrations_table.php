@@ -16,9 +16,12 @@ public function up(): void
         $table->foreignId('event_id')->constrained()->onDelete('cascade');
         $table->foreignId('user_id')->constrained()->onDelete('cascade');
         
-        // This includes all the statuses you need immediately
-        $table->enum('status', ['Pending', 'Confirmed', 'Present', 'Absent', 'Completed'])->default('Pending');
+        $table->enum('status', ['Pending', 'Confirmed', 'Present', 'Absent', 'Completed', 'Waitlisted'])->default('Pending');
+        $table->enum('payment_status', ['Unpaid', 'Pending', 'Paid', 'Free'])->default('Unpaid');
+        $table->string('proof_of_payment')->nullable();
         
+        $table->string('position')->nullable(); // <--- ADD IT HERE
+        $table->string('qr_token')->unique()->nullable();
         $table->timestamps();
     });
 }

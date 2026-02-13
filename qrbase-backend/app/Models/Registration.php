@@ -12,9 +12,12 @@ class Registration extends Model
     protected $fillable = [
         'event_id',
         'user_id',
-        'status',      // <--- THIS IS CRITICAL for check-ins
-        'qr_token',    // <--- This is needed for secure QR codes
-        'feedback'     // If you store feedback summary here (optional)
+        'status',
+        'qr_token',
+        'feedback',
+        'payment_status',   
+        'proof_of_payment',  
+        'position' // <--- ADDED HERE
     ];
 
     public function event() {

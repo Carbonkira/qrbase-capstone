@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 
 const Icon = ({ path, className = "w-6 h-6" }) => (
@@ -10,23 +10,32 @@ const STORAGE_URL = "http://localhost:8000/storage/";
 
 const Events = () => {
   const navigate = useNavigate();
-  // Initialize user from LocalStorage to prevent UI flickering
+  const location = useLocation();
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
   
   const [events, setEvents] = useState([]);
   const [allSpeakers, setAllSpeakers] = useState([]); 
   const [searchQuery, setSearchQuery] = useState("");
   
-  // States
+  // Event Management States
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
   const [selectedSpeakerIds, setSelectedSpeakerIds] = useState([]); 
   
-  // Profile State
+  // --- PROFILE & PASSWORD STATES ---
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isPasswordMode, setIsPasswordMode] = useState(false);
+  
   const [profileData, setProfileData] = useState({ 
       first_name: user?.first_name || '', 
-      last_name: user?.last_name || '' 
+      last_name: user?.last_name || '',
+      position: user?.position || '' 
+  });
+  
+  const [passwordData, setPasswordData] = useState({ 
+      current_password: '', 
+      new_password: '', 
+      new_password_confirmation: '' 
   });
   
   const [formData, setFormData] = useState({ title: "", description: "", location: "", max_participants: 100, schedule_date: new Date().toISOString().split('T')[0], image: null });
@@ -41,13 +50,18 @@ const Events = () => {
           const res = await api.get('/user'); 
           setUser(res.data); 
           localStorage.setItem('user', JSON.stringify(res.data));
-          setProfileData({ first_name: res.data.first_name, last_name: res.data.last_name });
+          setProfileData({ 
+              first_name: res.data.first_name, 
+              last_name: res.data.last_name,
+              position: res.data.position || '' 
+          });
       } catch (err) { console.error("Failed to load profile"); }
   };
 
   const fetchEvents = async () => { try { const res = await api.get('/events'); setEvents(res.data); } catch (err) { console.error("Error loading events", err); } };
   const fetchSpeakers = async () => { try { const res = await api.get('/all-speakers'); setAllSpeakers(res.data); } catch (err) { console.error("Error loading speakers", err); } };
 
+  // --- PROFILE & PASSWORD HANDLERS ---
   const handleUpdateProfile = async (e) => {
       e.preventDefault();
       try {
@@ -59,11 +73,29 @@ const Events = () => {
       } catch (err) { alert("Failed to update profile."); }
   };
 
-  // CALENDAR LOGIC FIXED
+  const handleChangePassword = async (e) => {
+      e.preventDefault();
+      if (passwordData.new_password !== passwordData.new_password_confirmation) {
+          return alert("New passwords do not match!");
+      }
+      try {
+          await api.put('/user/password', passwordData);
+          alert("Password changed successfully!");
+          setIsPasswordMode(false); 
+          setPasswordData({ current_password: '', new_password: '', new_password_confirmation: '' });
+      } catch (err) {
+          alert(err.response?.data?.message || "Failed to change password.");
+      }
+  };
+
+  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
+
+  // --- CALENDAR LOGIC ---
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const nextMonth = () => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
   const prevMonth = () => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
 
+  // --- EVENT ACTIONS ---
   const handleEditClick = (event) => {
     setIsEditing(true);
     setEditId(event.id);
@@ -97,8 +129,7 @@ const Events = () => {
     data.append('description', formData.description);
     data.append('location', formData.location);
     data.append('max_participants', formData.max_participants);
-    // Use selectedDate for the submission
-    data.append('schedule_date', selectedDate.toLocaleDateString('en-CA')); // Format YYYY-MM-DD
+    data.append('schedule_date', selectedDate.toLocaleDateString('en-CA')); 
     if (formData.image) data.append('image', formData.image);
     selectedSpeakerIds.forEach(id => data.append('speaker_ids[]', id));
 
@@ -120,17 +151,27 @@ const Events = () => {
   return (
     <div className="h-screen flex flex-col bg-[#e9eff6] font-sans text-slate-800 overflow-hidden relative">
       
-      {/* HEADER */}
+      {/* HEADER MATCHING ORGANIZER DASH */}
       <header className="flex justify-between items-center px-12 py-6 bg-white shadow-sm sticky top-0 z-50 shrink-0">
         <h1 onClick={() => navigate('/dashboard')} className="text-3xl font-black text-[#1e40af] tracking-tight cursor-pointer">QRBase Meetings</h1>
-        {user && (
-            <div onClick={() => setIsProfileOpen(true)} className="flex items-center gap-4 text-right cursor-pointer hover:opacity-80 transition-opacity group">
-                <div className="hidden sm:block">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500">Edit Profile</p>
-                    <p className="text-lg font-black text-[#1e40af] uppercase leading-none">{user.first_name} {user.last_name}</p>
+        {user ? (
+            <div className="flex items-center gap-4">
+                <div className="text-right hidden sm:block">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Organizer</p>
+                    {/* VISIBLE EDIT TRIGGER */}
+                    <div onClick={() => setIsProfileOpen(true)} className="flex items-center gap-2 cursor-pointer group">
+                        <p className="text-lg font-black text-[#1e40af] uppercase leading-none group-hover:text-blue-600 transition-colors">
+                            {user.first_name} {user.last_name}
+                        </p>
+                        <Icon path="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" className="w-4 h-4 text-slate-300 group-hover:text-blue-500" />
+                    </div>
                 </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black text-xl border-2 border-blue-50">{user.first_name.charAt(0)}</div>
+                <div onClick={() => setIsProfileOpen(true)} className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black text-xl border-2 border-blue-50 cursor-pointer hover:bg-blue-200 transition-colors">
+                    {user.first_name.charAt(0)}
+                </div>
             </div>
+        ) : (
+            <div className="text-xs font-bold text-slate-400">Loading Profile...</div>
         )}
       </header>
 
@@ -138,14 +179,14 @@ const Events = () => {
         <aside className="group absolute inset-y-0 left-0 z-20 flex flex-col justify-between w-24 hover:w-72 bg-[#1e293b] transition-all duration-300 m-6 rounded-[2.5rem] shadow-2xl overflow-hidden">
           <div className="flex flex-col gap-3 p-5 mt-4">
             {sidebarLinks.map((link) => (
-              <button key={link.name} onClick={() => navigate(link.path)} className={`flex items-center w-full py-4 px-4 rounded-2xl transition-all active:scale-95 ${link.name === "Events" ? "bg-[#2563eb] text-white" : "text-slate-400 hover:bg-[#2563eb] hover:text-white"}`}>
+              <button key={link.name} onClick={() => navigate(link.path)} className={`flex items-center w-full py-4 px-4 rounded-2xl transition-all active:scale-95 ${location.pathname.startsWith(link.path) ? "bg-[#2563eb] text-white" : "text-slate-400 hover:bg-[#2563eb] hover:text-white"}`}>
                 <div className="min-w-[32px] flex justify-center"><Icon path={link.icon} className="w-7 h-7" /></div>
                 <span className="ml-5 opacity-0 group-hover:opacity-100 transition-opacity font-black text-sm uppercase tracking-widest whitespace-nowrap">{link.name}</span>
               </button>
             ))}
           </div>
           <div className="p-5 mb-2">
-            <button onClick={() => { localStorage.clear(); navigate('/login'); }} className="flex items-center w-full py-4 px-4 rounded-2xl text-red-400 hover:bg-red-500 hover:text-white transition-all">
+            <button onClick={handleLogout} className="flex items-center w-full py-4 px-4 rounded-2xl text-red-400 hover:bg-red-500 hover:text-white transition-all">
               <div className="min-w-[32px] flex justify-center"><Icon path="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></div>
               <span className="ml-5 opacity-0 group-hover:opacity-100 transition-opacity font-black text-sm uppercase tracking-widest whitespace-nowrap">Log Out</span>
             </button>
@@ -188,7 +229,6 @@ const Events = () => {
             </section>
 
             {/* COLUMN 3: EVENT LIST */}
-            {/* ... (Event List code remains mostly the same, just keeping the font updates) ... */}
             <section className="flex flex-col gap-4">
               <span className="text-xl font-black text-gray-400 uppercase tracking-[0.2em] ml-4">Manage</span>
               <div className="bg-white rounded-[2.5rem] shadow-xl p-8 h-[650px] flex flex-col">
@@ -231,19 +271,89 @@ const Events = () => {
         </main>
       </div>
 
-      {/* EDIT PROFILE MODAL */}
+      {/* EDIT PROFILE / PASSWORD MODAL */}
       {isProfileOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 animate-in zoom-in">
-                <h3 className="text-2xl font-black text-[#1e40af] uppercase mb-6 text-center">Edit Profile</h3>
-                <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
-                    <input placeholder="First Name" value={profileData.first_name} onChange={(e) => setProfileData({...profileData, first_name: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
-                    <input placeholder="Last Name" value={profileData.last_name} onChange={(e) => setProfileData({...profileData, last_name: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
-                    <div className="flex gap-2 mt-4">
-                        <button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest">Cancel</button>
-                        <button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600">Save</button>
-                    </div>
-                </form>
+            <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-10 animate-in zoom-in">
+                
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-2xl font-black text-[#1e40af] uppercase text-center flex-1">
+                        {isPasswordMode ? "Change Password" : "Edit Profile"}
+                    </h3>
+                </div>
+
+                {/* TOGGLE TABS */}
+                <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+                    <button 
+                        onClick={() => setIsPasswordMode(false)} 
+                        className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${!isPasswordMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Profile
+                    </button>
+                    <button 
+                        onClick={() => setIsPasswordMode(true)} 
+                        className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${isPasswordMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Security
+                    </button>
+                </div>
+
+                {isPasswordMode ? (
+                    // --- PASSWORD FORM ---
+                    <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+                        <input 
+                            type="password" 
+                            placeholder="Current Password" 
+                            value={passwordData.current_password} 
+                            onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            type="password" 
+                            placeholder="New Password" 
+                            value={passwordData.new_password} 
+                            onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            type="password" 
+                            placeholder="Confirm New Password" 
+                            value={passwordData.new_password_confirmation} 
+                            onChange={(e) => setPasswordData({...passwordData, new_password_confirmation: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+                            <button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600">Update</button>
+                        </div>
+                    </form>
+                ) : (
+                    // --- PROFILE FORM ---
+                    <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
+                        <input 
+                            placeholder="First Name" 
+                            value={profileData.first_name} 
+                            onChange={(e) => setProfileData({...profileData, first_name: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            placeholder="Last Name" 
+                            value={profileData.last_name} 
+                            onChange={(e) => setProfileData({...profileData, last_name: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <input 
+                            placeholder="Position / Affiliation" 
+                            value={profileData.position || ''} 
+                            onChange={(e) => setProfileData({...profileData, position: e.target.value})} 
+                            className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" 
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button>
+                            <button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600">Save</button>
+                        </div>
+                    </form>
+                )}
             </div>
         </div>
       )}

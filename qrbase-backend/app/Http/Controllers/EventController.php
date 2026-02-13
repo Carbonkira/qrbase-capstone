@@ -12,9 +12,7 @@ class EventController extends Controller
 {
     public function index(Request $request) {
         return Event::with('speakers')
-            // Count total registrations (Booked)
             ->withCount('registrations') 
-            // Count only those marked 'Present'
             ->withCount(['registrations as present_count' => function ($query) {
                 $query->where('status', 'Present');
             }])
@@ -23,7 +21,6 @@ class EventController extends Controller
             ->get();
     }
 
-    // Create a new event
     public function store(Request $request) {
         $fields = $request->validate([
             'title' => 'required|string',
@@ -61,9 +58,7 @@ class EventController extends Controller
         return response()->json(['message' => 'Event created!', 'event' => $event], 201);
     }
 
-    // --- 2. UPDATE ---
     public function update(Request $request, $id) {
-        // Only find event if it belongs to this user
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
 
         $fields = $request->validate([
@@ -90,9 +85,7 @@ class EventController extends Controller
         return response()->json(['message' => 'Event updated!', 'event' => $event]);
     }
 
-    // --- 3. DELETE ---
     public function destroy(Request $request, $id) {
-        // Only find event if it belongs to this user
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
         
         if ($event->image) Storage::disk('public')->delete($event->image);
@@ -100,18 +93,15 @@ class EventController extends Controller
         return response()->json(['message' => 'Event deleted']);
     }
 
-    // --- 4. MODULE DATA (FIXED to return available_speakers) ---
+    // --- MODULE DATA (With Custom Statistics) ---
     public function getEventModuleData(Request $request, $id) {
-        // Only allow viewing if you are the organizer
         $event = Event::with(['registrations.user', 'speakers'])
-            ->withCount(['registrations as present_count' => function($q){
-                $q->where('status', 'Present');
-            }])
             ->where('organizer_id', $request->user()->id)
             ->findOrFail($id);
 
         $form = DB::table('event_feedback_forms')->where('event_id', $id)->first();
 
+        // Bind Feedback to Attendees
         $feedbackResponses = DB::table('feedback_responses')
             ->where('event_id', $id)
             ->get()
@@ -122,27 +112,41 @@ class EventController extends Controller
             $reg->feedback = $response ? json_decode($response->responses, true) : null;
         });
 
-        $feedbackCount = $feedbackResponses->count();
-
-        // FETCH GLOBAL ROSTER for "Add Existing" dropdown
+        // FETCH ROSTER
         $allSpeakers = Speaker::where('organizer_id', $request->user()->id)->get();
+        
+        // --- STATISTICS CALCULATION ---
+        
+        // 1. Slots Taken (Only Paid or Free)
+        $paidOrFreeCount = $event->registrations->filter(function($r) {
+            return $r->payment_status === 'Paid' || $r->payment_status === 'Free';
+        })->count();
+
+        // 2. Waitlist Capacity (10% of total)
+        $waitlistCapacity = floor($event->max_participants * 0.10);
+
+        $stats = [
+            'total_registered' => $event->registrations->count(),
+            'total_paid'       => $event->registrations->where('payment_status', 'Paid')->count(),
+            'total_present'    => $event->registrations->where('status', 'Present')->count(),
+            'total_no_show'    => $event->registrations->where('status', 'Absent')->count(),
+            'waitlist_count'   => $event->registrations->where('status', 'Waitlisted')->count(),
+            'waitlist_cap'     => $waitlistCapacity,
+            'slots_taken'      => $paidOrFreeCount, // Used to calculate "Slots Left"
+            'feedback_received' => $feedbackResponses->count(),
+            'capacity'         => $event->max_participants
+        ];
         
         return response()->json([
             'event' => $event,
-            'stats' => [
-                'total_registered' => $event->registrations->count(),
-                'total_present' => $event->present_count,
-                'feedback_received' => $feedbackCount,
-                'capacity' => $event->max_participants
-            ],
+            'stats' => $stats,
             'attendees' => $event->registrations, 
-            'speakers' => $event->speakers, // Speakers specifically attached to this event
-            'available_speakers' => $allSpeakers, // All speakers owned by user (for selection)
+            'speakers' => $event->speakers, 
+            'available_speakers' => $allSpeakers, 
             'feedback_form' => $form
         ]);
     }
 
-    // Dashboard Statistics
     public function dashboardStats(Request $request) {
         $organizerId = $request->user()->id;
         $eventIds = Event::where('organizer_id', $organizerId)->pluck('id');
@@ -155,10 +159,8 @@ class EventController extends Controller
         ]);
     }
 
-    // ORGANIZER: Save Feedback Form
     public function saveFeedbackForm(Request $request, $id) {
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
-
         $request->validate(['questions' => 'required']); 
         
         DB::table('event_feedback_forms')->updateOrInsert(
@@ -173,7 +175,6 @@ class EventController extends Controller
         return response()->json(['message' => 'Form saved']);
     }
 
-    // Allow Participants to get the form structure
     public function getParticipantForm($id) {
         $event = Event::with('speakers')->findOrFail($id);
         
@@ -182,9 +183,7 @@ class EventController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$form) {
-            return response()->json(['message' => 'Form not ready'], 404);
-        }
+        if (!$form) return response()->json(['message' => 'Form not ready'], 404);
 
         return response()->json([
             'event' => $event,
@@ -193,16 +192,13 @@ class EventController extends Controller
         ]);
     }
 
-    // PARTICIPANT: Submit Feedback
     public function submitFeedback(Request $request, $id) {
         $existing = DB::table('feedback_responses')
             ->where('event_id', $id)
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if ($existing) {
-            return response()->json(['message' => 'Feedback already submitted.'], 400);
-        }
+        if ($existing) return response()->json(['message' => 'Feedback already submitted.'], 400);
 
         $request->validate(['responses' => 'required']);
 
