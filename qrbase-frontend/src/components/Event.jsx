@@ -151,9 +151,26 @@ const Events = () => {
   return (
     <div className="h-screen flex flex-col bg-[#e9eff6] font-sans text-slate-800 overflow-hidden relative">
       
+      {/* CUSTOM SCROLLBAR STYLE */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #2563eb;
+        }
+      `}</style>
+      
       {/* HEADER MATCHING ORGANIZER DASH */}
       <header className="flex justify-between items-center px-12 py-6 bg-white shadow-sm sticky top-0 z-50 shrink-0">
-        <h1 onClick={() => navigate('/dashboard')} className="text-3xl font-black text-[#1e40af] tracking-tight cursor-pointer">QRBase Meetings</h1>
+        <h1 onClick={() => navigate('/dashboard')} className="text-3xl font-black text-[#1e40af] tracking-tight cursor-pointer">QR Meets</h1>
         {user ? (
             <div className="flex items-center gap-4">
                 <div className="text-right hidden sm:block">
@@ -193,18 +210,18 @@ const Events = () => {
           </div>
         </aside>
 
-        <main className="flex-1 ml-32 p-10 overflow-y-auto">
+        <main className="flex-1 ml-32 p-10 overflow-y-auto custom-scrollbar">
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             
             {/* COLUMN 1: FORM */}
             <section className="flex flex-col gap-4">
               <span className="text-xl font-black text-gray-400 uppercase tracking-[0.2em] ml-4">{isEditing ? "Edit Event" : "Create Event"}</span>
-              <div className="bg-white rounded-[2.5rem] shadow-xl p-8 h-[650px] flex flex-col gap-6 overflow-y-auto border border-white/50">
+              <div className="bg-white rounded-[2.5rem] shadow-xl p-8 h-[650px] flex flex-col gap-6 overflow-y-auto custom-scrollbar border border-white/50">
                   <div className="flex flex-col gap-2"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Event Title</label><input value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full bg-[#f1f5f9] border-2 border-slate-100 rounded-xl p-4 text-sm font-bold outline-none focus:border-[#2563eb]" placeholder="E.G. TECH SUMMIT 2026" /></div>
                   <div className="flex flex-col gap-2"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Location</label><input value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})} className="w-full bg-[#f1f5f9] border-2 border-slate-100 rounded-xl p-4 text-sm font-bold outline-none focus:border-[#2563eb]" placeholder="E.G. GRAND HALL A" /></div>
                   <div className="flex flex-col gap-2"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Allowed Participants</label><input type="number" value={formData.max_participants} onChange={(e) => setFormData({...formData, max_participants: e.target.value})} className="w-full bg-[#f1f5f9] border-2 border-slate-100 rounded-xl p-4 text-sm font-bold outline-none focus:border-[#2563eb]" placeholder="100" /></div>
                   <div className="flex flex-col gap-2"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Description</label><textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full bg-[#f1f5f9] border-2 border-slate-100 rounded-xl p-4 text-sm font-bold outline-none focus:border-[#2563eb] h-32 resize-none" placeholder="EVENT DETAILS..." /></div>
-                  <div className="flex flex-col gap-2 border-t border-slate-100 pt-3"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Select Speakers</label><div className="bg-[#f8fafc] border-2 border-slate-100 rounded-xl p-3 max-h-48 overflow-y-auto">{allSpeakers.length > 0 ? (allSpeakers.map(speaker => (<label key={speaker.id} className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg cursor-pointer"><input type="checkbox" checked={selectedSpeakerIds.includes(speaker.id)} onChange={() => handleSpeakerToggle(speaker.id)} className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" /><div className="flex flex-col"><span className="text-sm font-bold text-slate-700">{speaker.name}</span><span className="text-xs text-slate-400 uppercase">{speaker.specialization}</span></div></label>))) : (<div className="text-center py-4"><span className="text-xs text-slate-400 font-bold uppercase">No speakers found.<br/>Go to Speakers tab to add some.</span></div>)}</div></div>
+                  <div className="flex flex-col gap-2 border-t border-slate-100 pt-3"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Select Speakers</label><div className="bg-[#f8fafc] border-2 border-slate-100 rounded-xl p-3 max-h-48 overflow-y-auto custom-scrollbar">{allSpeakers.length > 0 ? (allSpeakers.map(speaker => (<label key={speaker.id} className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg cursor-pointer"><input type="checkbox" checked={selectedSpeakerIds.includes(speaker.id)} onChange={() => handleSpeakerToggle(speaker.id)} className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500" /><div className="flex flex-col"><span className="text-sm font-bold text-slate-700">{speaker.name}</span><span className="text-xs text-slate-400 uppercase">{speaker.specialization}</span></div></label>))) : (<div className="text-center py-4"><span className="text-xs text-slate-400 font-bold uppercase">No speakers found.<br/>Go to Speakers tab to add some.</span></div>)}</div></div>
                   <div className="flex flex-col gap-2"><label className="text-sm font-black text-[#1e40af] uppercase ml-1">Banner Image</label><input type="file" onChange={(e) => setFormData({...formData, image: e.target.files[0]})} className="w-full bg-[#f1f5f9] border-2 border-slate-100 rounded-xl p-3 text-sm font-bold file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div>
                   <div className="mt-auto flex gap-2"><button onClick={handleSubmit} className="flex-1 bg-[#1e293b] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#2563eb] shadow-lg transition-all active:scale-95">{isEditing ? "Update Event" : "Create Event"}</button>{isEditing && <button onClick={handleCancelEdit} className="px-6 bg-red-50 text-red-500 py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-red-100 transition-all active:scale-95">Cancel</button>}</div>
               </div>
@@ -220,7 +237,7 @@ const Events = () => {
                     <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-[#1e40af]"><Icon path="M8.25 4.5l7.5 7.5-7.5 7.5" /></button>
                 </div>
                 <div className="p-5 bg-[#f1f5f9] rounded-2xl flex items-center gap-4 text-[#2563eb] border border-slate-100"><Icon path="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" className="w-8 h-8" /><div className="flex flex-col"><span className="text-xs font-black text-slate-400 uppercase tracking-tighter">Selected Date</span><span className="text-xl font-bold text-slate-700 uppercase">{selectedDate.toLocaleDateString()}</span></div></div>
-                <div className="flex-1 overflow-y-auto scrollbar-hide">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                   <div className="grid grid-cols-7 gap-2 text-center text-sm font-bold">
                     {Array.from({ length: getDaysInMonth(viewDate.getFullYear(), viewDate.getMonth()) }, (_, i) => { const day = i + 1; const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === viewDate.getMonth(); return (<div key={i} onClick={() => setSelectedDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), day))} className={`p-4 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-[#2563eb] text-white shadow-md shadow-blue-200 font-black' : 'text-slate-500 hover:bg-slate-50'}`}>{day}</div>); })}
                   </div>
@@ -235,7 +252,7 @@ const Events = () => {
                 <h2 className="text-3xl font-black text-[#1e40af] tracking-tight mb-6 text-center uppercase">My events</h2>
                 <div className="relative mb-6"><div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-blue-500"><Icon path="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" className="w-5 h-5" /></div><input type="text" placeholder="SEARCH..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#f1f5f9] border-2 border-slate-50 rounded-2xl py-4 pl-14 pr-4 text-sm font-black uppercase tracking-widest outline-none focus:border-[#2563eb] focus:bg-white transition-all shadow-sm" /></div>
 
-                <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar">
                   {filteredEvents.length > 0 ? (
                     filteredEvents.map((event) => (
                       <div key={event.id} className={`p-6 border-2 rounded-[2rem] flex flex-col gap-5 transition-all ${editId === event.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-50'}`}>

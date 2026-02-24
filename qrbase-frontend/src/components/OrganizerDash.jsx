@@ -116,7 +116,7 @@ const OrganizerDash = () => {
       
       {/* HEADER */}
       <header className="flex justify-between items-center px-12 py-6 bg-white shadow-sm sticky top-0 z-50 shrink-0">
-        <h1 onClick={() => navigate('/dashboard')} className="text-3xl font-black text-[#1e40af] tracking-tight cursor-pointer">QRBase Meetings</h1>
+        <h1 onClick={() => navigate('/dashboard')} className="text-3xl font-black text-[#1e40af] tracking-tight cursor-pointer">QR Meets</h1>
         
         {user ? (
             <div className="flex items-center gap-4">

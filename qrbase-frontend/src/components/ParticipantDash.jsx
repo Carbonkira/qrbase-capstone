@@ -1,0 +1,351 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import QRCode from "react-qr-code"; 
+import api from '../api';
+
+const Icon = ({ path, className = "w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d={path} /></svg>
+);
+
+const STORAGE_URL = "http://localhost:8000/storage/";
+
+const ParticipantDash = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [myEvents, setMyEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null); 
+  const [evalModalOpen, setEvalModalOpen] = useState(false); 
+  const [joinModalOpen, setJoinModalOpen] = useState(false); 
+  const [isProfileOpen, setIsProfileOpen] = useState(false); 
+  const [inviteCode, setInviteCode] = useState(""); 
+  
+  const [profileData, setProfileData] = useState({ first_name: '', last_name: '' });
+  const [eventDetails, setEventDetails] = useState(null); 
+  const [formConfig, setFormConfig] = useState({ global: [], speakers: {} });
+  const [answers, setAnswers] = useState({});
+
+  const [isPasswordMode, setIsPasswordMode] = useState(false);
+  const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '', new_password_confirmation: '' });
+
+  const handleChangePassword = async (e) => {
+      e.preventDefault();
+      if (passwordData.new_password !== passwordData.new_password_confirmation) return alert("New passwords do not match!");
+      try {
+          await api.put('/user/password', passwordData);
+          alert("Password changed successfully!");
+          setIsPasswordMode(false); 
+          setPasswordData({ current_password: '', new_password: '', new_password_confirmation: '' });
+      } catch (err) { alert(err.response?.data?.message || "Failed to change password."); }
+  };
+
+  useEffect(() => { fetchUser(); fetchTickets(); }, []);
+
+  const fetchUser = async () => {
+      try { 
+          const res = await api.get('/user'); 
+          setUser(res.data); 
+          setProfileData({ first_name: res.data.first_name, last_name: res.data.last_name });
+      } catch (err) { console.error("Failed to load profile"); }
+  };
+
+  const fetchTickets = async () => {
+      try { const res = await api.get('/my-tickets'); setMyEvents(res.data); } catch (err) { console.error(err); }
+  };
+
+  const handleUpdateProfile = async (e) => {
+      e.preventDefault();
+      try {
+          const res = await api.put('/user/profile', profileData);
+          setUser(res.data.user);
+          setIsProfileOpen(false);
+          alert("Profile updated successfully!");
+      } catch (err) { alert("Failed to update profile."); }
+  };
+
+  const openTicket = (ticket) => { setSelectedEvent(ticket); };
+  
+  const openEvaluation = async (ticket) => {
+      try {
+          const res = await api.get(`/events/${ticket.event.id}/form`);
+          setEventDetails(res.data);
+          let config = { global: [], speakers: {} };
+          if (res.data.feedback_form && res.data.feedback_form.questions) {
+              try { const parsed = JSON.parse(res.data.feedback_form.questions); if (!Array.isArray(parsed)) config = parsed; } catch (e) { }
+          }
+          setFormConfig(config); setAnswers({}); setEvalModalOpen(true);
+      } catch (err) { if(err.response?.status === 404) alert("Evaluation not active yet."); else alert("Error loading form."); }
+  };
+
+  const handleAnswerChange = (key, value) => { setAnswers(prev => ({ ...prev, [key]: value })); };
+  
+  const submitEvaluation = async () => { 
+      if (!eventDetails) return; 
+      try { 
+          await api.post(`/events/${eventDetails.event.id}/feedback`, { responses: answers }); 
+          alert("Feedback Submitted!"); setEvalModalOpen(false); fetchTickets(); 
+      } catch (err) { alert(err.response?.data?.message || "Submission failed."); } 
+  };
+
+  const handleJoinEvent = async (e) => { 
+      e.preventDefault(); 
+      try { 
+          const res = await api.post('/join', { invite_code: inviteCode }); 
+          alert(res.data.message); setJoinModalOpen(false); setInviteCode(""); fetchTickets(); 
+      } catch (err) { alert(err.response?.data?.message || "Failed."); } 
+  };
+
+  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
+  const renderStars = (answerKey) => ( <div className="flex flex-wrap gap-2">{[1,2,3,4,5].map(star => (<button key={star} onClick={() => handleAnswerChange(answerKey, star)} className={`w-10 h-10 rounded-xl font-black text-sm transition-all ${answers[answerKey] >= star ? 'bg-yellow-400 text-white' : 'bg-slate-100 text-slate-300'}`}>{star}</button>))}</div> );
+
+  return (
+    <div className="h-screen flex flex-col bg-[#e9eff6] font-sans text-slate-800 overflow-hidden relative">
+      
+      {/* HEADER */}
+      <header className="flex flex-col md:flex-row justify-between items-center px-6 md:px-12 py-4 md:py-6 bg-white shadow-sm sticky top-0 z-50 shrink-0 gap-4">
+        <div className="flex items-center justify-between w-full md:w-auto gap-6">
+            <h1 className="text-2xl md:text-3xl font-black text-[#1e40af] tracking-tight">Overview</h1>
+            <button onClick={() => setJoinModalOpen(true)} className="bg-[#1e293b] text-white px-4 md:px-8 py-3 md:py-4 rounded-2xl font-black text-[10px] md:text-sm uppercase tracking-widest hover:bg-blue-600 shadow-lg active:scale-95 transition-all">+ Join Event</button>
+        </div>
+        <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-8">
+            {user && (
+                <div onClick={() => setIsProfileOpen(true)} className="flex items-center gap-3 md:gap-4 text-right cursor-pointer hover:opacity-80 transition-opacity group">
+                    <div className="block">
+                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blue-500 leading-tight">Account Settings</p>
+                        <p className="text-sm md:text-lg font-black text-[#1e40af] uppercase leading-none">{user.first_name} {user.last_name}</p>
+                    </div>
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black text-lg md:text-xl border-2 border-blue-50 shrink-0 transition-transform active:scale-90">{user.first_name.charAt(0)}</div>
+                </div>
+            )}
+            
+            {/* ENLARGED MINIMAL LOGOUT */}
+            <button 
+                onClick={handleLogout} 
+                className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 border-slate-100 text-slate-400 hover:text-red-500 hover:border-red-100 hover:bg-red-50 transition-all active:scale-95 group"
+            >
+                <span className="hidden md:block text-[10px] font-black uppercase tracking-[0.2em]">Logout</span>
+                <Icon path="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" className="w-5 h-5 md:w-6 md:h-6" />
+            </button>
+        </div>
+      </header>
+
+      {/* EVENT LIST */}
+      <main className="flex-1 p-4 md:p-10 overflow-y-auto">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
+            {myEvents.length === 0 && <div className="col-span-full text-center py-24 opacity-50"><h3 className="text-2xl md:text-3xl font-black uppercase text-slate-400">No events yet</h3></div>}
+            
+            {myEvents.map(ticket => (
+                <div key={ticket.id} className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm hover:shadow-2xl transition-all cursor-pointer border-4 border-transparent hover:border-blue-100 flex flex-col h-full" onClick={() => openTicket(ticket)}>
+                    
+                    <div className="h-40 md:h-48 w-full bg-slate-100 rounded-[1.5rem] md:rounded-[2rem] mb-6 overflow-hidden relative shadow-inner">
+                        {ticket.event.image ? <img src={STORAGE_URL + ticket.event.image} className="w-full h-full object-cover" alt="Event" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-[10px] md:text-sm uppercase tracking-widest">No Image</div>}
+                        <div className="absolute top-4 right-4">
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-sm ${
+                                ticket.status === 'Waitlisted' ? 'bg-orange-100 text-orange-600' :
+                                ticket.payment_status === 'Unpaid' ? 'bg-red-100 text-red-600' :
+                                'bg-white/95 text-blue-600'
+                            }`}>
+                                {ticket.status === 'Waitlisted' ? 'Waitlisted' : ticket.payment_status === 'Unpaid' ? 'Unpaid' : ticket.status}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex-1">
+                        <h3 className="text-xl md:text-2xl font-black text-slate-800 uppercase tracking-tight leading-tight mb-2">{ticket.event.title}</h3>
+                        <p className="text-xs md:text-sm font-bold text-slate-400 mb-4">{ticket.event.schedule_date} @ {ticket.event.location}</p>
+                        
+                        <div className="flex flex-col gap-2 mb-6">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[9px] md:text-[10px] font-black text-blue-400 uppercase tracking-widest min-w-[70px] md:min-w-[80px]">Organized By:</span>
+                                <span className="text-[10px] md:text-xs font-black text-slate-700 uppercase">{ticket.event.organizer ? `${ticket.event.organizer.first_name} ${ticket.event.organizer.last_name}` : "Unknown"}</span>
+                            </div>
+
+                            {ticket.event.speakers && ticket.event.speakers.length > 0 && (
+                                <div className="flex items-start gap-2 mt-1">
+                                    <span className="text-[9px] md:text-[10px] font-black text-blue-400 uppercase tracking-widest min-w-[70px] md:min-w-[80px] mt-0.5">Speakers:</span>
+                                    <div className="flex flex-col gap-2">
+                                        {ticket.event.speakers.map(s => (
+                                            <div key={s.id} className="flex flex-col">
+                                                <span className="text-[10px] md:text-xs font-black text-slate-700 uppercase leading-none">{s.name}</span>
+                                                <span className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-wider">{s.pivot?.topic || s.topic || "Topic TBA"}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {ticket.status === 'Present' && (
+                        ticket.has_feedback ? 
+                        <button disabled className="w-full bg-green-50 text-green-600 py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest cursor-not-allowed border border-green-100 flex items-center justify-center gap-2"><Icon path="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />Completed</button> 
+                        : <button onClick={(e) => { e.stopPropagation(); openEvaluation(ticket); }} className="w-full bg-[#1e293b] text-white py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-blue-600 shadow-xl active:scale-95">Evaluate</button>
+                    )}
+                </div>
+            ))}
+          </div>
+      </main>
+
+      {/* JOIN MODAL */}
+      {joinModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-sm rounded-[2rem] md:rounded-[2.5rem] shadow-2xl p-6 md:p-8 animate-in zoom-in">
+                <h3 className="text-xl md:text-2xl font-black text-[#1e40af] uppercase mb-1 text-center">Join Event</h3>
+                <form onSubmit={handleJoinEvent} className="flex flex-col gap-4 mt-6">
+                    <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="ENTER CODE" className="bg-[#f1f5f9] p-4 md:p-5 rounded-2xl text-center font-black uppercase tracking-widest text-lg md:text-xl outline-none border-2 border-transparent focus:border-blue-500" autoFocus />
+                    <div className="flex gap-2"><button type="button" onClick={() => setJoinModalOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest">Cancel</button><button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-blue-600">Join</button></div>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* EDIT PROFILE / CHANGE PASSWORD MODAL */}
+      {isProfileOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-[2rem] md:rounded-[2.5rem] shadow-2xl p-6 md:p-10 animate-in zoom-in">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl md:text-2xl font-black text-[#1e40af] uppercase text-center flex-1">{isPasswordMode ? "Change Password" : "Edit Profile"}</h3>
+                  </div>
+                  <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+                      <button onClick={() => setIsPasswordMode(false)} className={`flex-1 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase transition-all ${!isPasswordMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>Profile</button>
+                      <button onClick={() => setIsPasswordMode(true)} className={`flex-1 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase transition-all ${isPasswordMode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>Security</button>
+                  </div>
+
+                  {isPasswordMode ? (
+                      <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+                          <input type="password" placeholder="Current Password" value={passwordData.current_password} onChange={(e) => setPasswordData({...passwordData, current_password: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
+                          <input type="password" placeholder="New Password" value={passwordData.new_password} onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
+                          <input type="password" placeholder="Confirm New Password" value={passwordData.new_password_confirmation} onChange={(e) => setPasswordData({...passwordData, new_password_confirmation: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
+                          <div className="flex gap-2 mt-4"><button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button><button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-blue-600">Update</button></div>
+                      </form>
+                  ) : (
+                      <form onSubmit={handleUpdateProfile} className="flex flex-col gap-4">
+                          <input placeholder="First Name" value={profileData.first_name} onChange={(e) => setProfileData({...profileData, first_name: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
+                          <input placeholder="Last Name" value={profileData.last_name} onChange={(e) => setProfileData({...profileData, last_name: e.target.value})} className="bg-[#f1f5f9] p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-500" />
+                          <div className="flex gap-2 mt-4"><button type="button" onClick={() => setIsProfileOpen(false)} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-slate-200">Cancel</button><button type="submit" className="flex-1 bg-[#1e293b] text-white py-4 rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-blue-600">Save</button></div>
+                      </form>
+                  )}
+
+                  {/* OPTIONAL LOGOUT BUTTON INSIDE PROFILE MODAL */}
+                  <div className="mt-8 pt-6 border-t border-slate-100">
+                      <button onClick={handleLogout} className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-red-50 text-red-600 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] hover:bg-red-100 transition-all active:scale-95">
+                          <Icon path="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" className="w-4 h-4" />
+                          Sign Out
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* TICKET DETAILS MODAL */}
+      {selectedEvent && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <div className="bg-white w-[95%] md:w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[2rem] md:rounded-[2.5rem] shadow-2xl p-6 md:p-8 animate-in zoom-in relative flex flex-col md:flex-row gap-6 md:gap-8">
+                <button onClick={() => setSelectedEvent(null)} className="absolute top-4 right-4 md:top-6 md:right-6 z-10 text-slate-400 hover:text-red-500 bg-white rounded-full p-2 shadow-sm transition-colors"><Icon path="M6 18L18 6M6 6l12 12" /></button>
+                
+                {/* LEFT COLUMN: TICKET QR */}
+                <div className="flex flex-col items-center justify-start bg-blue-50 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] w-full md:min-w-[260px] md:w-auto h-fit">
+                    {(selectedEvent.payment_status === 'Paid' || selectedEvent.payment_status === 'Free') ? (
+                        <>
+                            <div className="bg-white p-4 rounded-2xl shadow-sm mb-4"><QRCode size={140} value={selectedEvent.qr_token || String(selectedEvent.id)} className="w-full h-auto" /></div>
+                            <div className="text-center">
+                                <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Ticket ID</p>
+                                <p className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter mb-2">#{selectedEvent.id}</p>
+                                <div className="bg-blue-100/50 p-2 rounded-lg inline-block w-full max-w-[200px]">
+                                    <p className="text-[8px] font-bold text-blue-400 uppercase">Secure Token</p>
+                                    <p className="text-[9px] font-mono text-slate-500 break-all">{selectedEvent.qr_token ? selectedEvent.qr_token.substring(0, 16) + "..." : "LEGACY"}</p>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="bg-orange-100 p-6 rounded-2xl text-center border-2 border-orange-200">
+                             <h3 className="text-lg md:text-xl font-black text-orange-600 uppercase mb-2">Payment Pending</h3>
+                             <p className="text-[10px] md:text-xs font-bold text-orange-400">Please verify your payment with the organizer to reveal your QR Code.</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* RIGHT COLUMN: DETAILS */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    <div className="h-32 md:h-40 w-full bg-slate-100 rounded-[1.5rem] mb-6 overflow-hidden shrink-0">
+                        {selectedEvent.event.image ? <img src={STORAGE_URL + selectedEvent.event.image} className="w-full h-full object-cover" alt="Banner" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">No Image</div>}
+                    </div>
+                    <h2 className="text-2xl md:text-3xl font-black text-[#1e40af] uppercase leading-tight mb-4">{selectedEvent.event.title}</h2>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        <div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Date</span><span className="text-sm font-bold text-slate-700">{selectedEvent.event.schedule_date}</span></div>
+                        <div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Location</span><span className="text-sm font-bold text-slate-700">{selectedEvent.event.location}</span></div>
+                    </div>
+
+                    <div className="bg-slate-50 p-5 md:p-6 rounded-2xl md:rounded-3xl border border-slate-100 mb-6">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Event Description</span>
+                        <p className="text-sm font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">{selectedEvent.event.description || "No description provided."}</p>
+                    </div>
+
+                    {selectedEvent.event.speakers && selectedEvent.event.speakers.length > 0 && (
+                        <div className="border-t-2 border-slate-100 pt-6">
+                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight mb-4">Event Speakers</h3>
+                            <div className="space-y-4">
+                                {selectedEvent.event.speakers.map(s => (
+                                    <div key={s.id} className="bg-slate-50 border border-slate-100 p-4 md:p-5 rounded-[1.5rem] flex flex-col sm:flex-row gap-4 items-start">
+                                        <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-blue-500 font-black text-lg md:text-xl">
+                                            {s.photo_path ? <img src={STORAGE_URL + s.photo_path} alt={s.name} className="w-full h-full object-cover" /> : s.name.charAt(0)}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-start mb-1 flex-wrap gap-2">
+                                                <h4 className="font-black text-slate-700 uppercase text-sm md:text-base">{s.name}</h4>
+                                                <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded-lg text-[8px] md:text-[9px] font-black uppercase tracking-wider">{s.pivot?.topic || s.topic || "Speaker"}</span>
+                                            </div>
+                                            <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{s.specialization}</p>
+                                            {s.contact_email && <p className="text-[10px] md:text-xs text-blue-500 font-bold mb-2">Contact: {s.contact_email}</p>}
+                                            <p className="text-xs md:text-sm text-slate-500 leading-relaxed bg-white p-3 rounded-xl border border-slate-100">{s.description || "No bio provided."}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* EVALUATION MODAL */}
+      {evalModalOpen && eventDetails && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <div className="bg-white w-[95%] md:w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-[2rem] md:rounded-[3rem] shadow-2xl p-6 md:p-10 animate-in zoom-in">
+                <h3 className="text-2xl md:text-3xl font-black text-[#1e40af] uppercase mb-8 text-center">Feedback</h3>
+                <div className="space-y-10">
+                    {formConfig.global && formConfig.global.length > 0 && (<div><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">General Questions</h4>{formConfig.global.map((q, idx) => (<div key={idx} className="mb-8"><p className="text-base md:text-lg font-bold text-slate-800 mb-3">{q.text}</p>{q.type === 'rating' ? renderStars(`global_${idx}`) : <textarea onChange={(e) => handleAnswerChange(`global_${idx}`, e.target.value)} className="w-full bg-[#f1f5f9] p-4 rounded-xl text-sm font-bold outline-none h-24 resize-none" placeholder="Your answer..." />}</div>))}</div>)}
+                    
+                    {eventDetails.speakers.map(s => {
+                        const speakerQuestions = formConfig.speakers?.[s.id] || [];
+                        if (speakerQuestions.length === 0) return null;
+                        return (
+                            <div key={s.id}>
+                                <div className="flex items-center gap-3 md:gap-4 mb-4 border-b-2 border-slate-100 pb-3">
+                                    <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black text-xs md:text-sm shrink-0">{s.name.charAt(0)}</div>
+                                    <div>
+                                        <h4 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-tight">{s.name}</h4>
+                                        <p className="text-[9px] md:text-[10px] font-bold text-blue-500 uppercase tracking-widest leading-none mt-1">Topic: {s.pivot?.topic || s.topic || "General"}</p>
+                                    </div>
+                                </div>
+                                {speakerQuestions.map((q, idx) => (
+                                    <div key={idx} className="mb-8 pl-4 md:pl-6 border-l-4 border-slate-100">
+                                        <p className="text-base md:text-lg font-bold text-slate-800 mb-3">{q.text}</p>
+                                        {q.type === 'rating' ? renderStars(`speaker_${s.id}_${idx}`) : <textarea onChange={(e) => handleAnswerChange(`speaker_${s.id}_${idx}`, e.target.value)} className="w-full bg-[#f1f5f9] p-4 rounded-xl text-sm font-bold outline-none h-24 resize-none" placeholder="Your answer..." />}
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })}
+                    <div><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">Additional Comments</h4><textarea onChange={(e) => handleAnswerChange('final_comments', e.target.value)} className="w-full bg-[#f1f5f9] p-4 rounded-xl text-sm font-bold outline-none h-24 resize-none" placeholder="Any other thoughts?" /></div>
+                </div>
+                <div className="flex flex-col md:flex-row gap-4 mt-10 pt-8 border-t border-slate-100"><button onClick={() => setEvalModalOpen(false)} className="bg-slate-100 text-slate-500 py-4 md:py-5 rounded-2xl font-black text-[10px] md:text-sm uppercase tracking-widest hover:bg-slate-200 order-2 md:order-1">Cancel</button><button onClick={submitEvaluation} className="flex-1 bg-[#1e293b] text-white py-4 md:py-5 rounded-2xl font-black text-[10px] md:text-sm uppercase tracking-widest hover:bg-blue-600 shadow-xl order-1 md:order-2">Submit Feedback</button></div>
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ParticipantDash;
