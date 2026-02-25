@@ -21,4 +21,5 @@ RUN composer install --no-dev --optimize-autoloader
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 # Run storage:link, migrations, and start the server
-CMD php artisan migrate --force && php artisan storage:link && php artisan serve --host=0.0.0.0 --port=$PORT
+ENV CLOUDINARY_URL="cloudinary://785553928652788:CBMFldO9HDKUF3H3ZiMeG9i5sDY@dyxszia6d"
+CMD php artisan config:clear && php artisan migrate --force && php artisan storage:link && php artisan serve --host=0.0.0.0 --port=$PORT
