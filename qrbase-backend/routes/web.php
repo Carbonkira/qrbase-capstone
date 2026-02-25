@@ -2,9 +2,20 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan; // <--- Added this line
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AttendanceController;
+
+// =========================================================
+// THE CACHE SELF-DESTRUCT BUTTON
+// =========================================================
+Route::get('/clear-cache', function() {
+    Artisan::call('optimize:clear');
+    Artisan::call('config:clear');
+    Artisan::call('cache:clear');
+    return 'Cache completely wiped! Laravel is now forced to read your new Cloudinary file. You can now upload images.';
+});
 
 // Public Routes (No login required)
 Route::post('/register', [AuthController::class, 'register']);
