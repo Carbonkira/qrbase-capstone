@@ -141,7 +141,7 @@ const ParticipantDash = () => {
                 <div key={ticket.id} className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-sm hover:shadow-2xl transition-all cursor-pointer border-4 border-transparent hover:border-blue-100 flex flex-col h-full" onClick={() => openTicket(ticket)}>
                     
                     <div className="h-40 md:h-48 w-full bg-slate-100 rounded-[1.5rem] md:rounded-[2rem] mb-6 overflow-hidden relative shadow-inner">
-                        {ticket.event.image ? <img src={STORAGE_URL + ticket.event.image} className="w-full h-full object-cover" alt="Event" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-[10px] md:text-sm uppercase tracking-widest">No Image</div>}
+                        {ticket.event.image ? <img src={getImageUrl(ticket.event.image)} className="w-full h-full object-cover" alt="Event" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-[10px] md:text-sm uppercase tracking-widest">No Image</div>}
                         <div className="absolute top-4 right-4">
                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-sm ${
                                 ticket.status === 'Waitlisted' ? 'bg-orange-100 text-orange-600' :
@@ -271,8 +271,7 @@ const ParticipantDash = () => {
                 {/* RIGHT COLUMN: DETAILS */}
                 <div className="flex-1 flex flex-col min-w-0">
                     <div className="h-32 md:h-40 w-full bg-slate-100 rounded-[1.5rem] mb-6 overflow-hidden shrink-0">
-                        {selectedEvent.event.image ? <img src={STORAGE_URL + selectedEvent.event.image} className="w-full h-full object-cover" alt="Banner" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">No Image</div>}
-                    </div>
+{selectedEvent.event.image ? <img src={getImageUrl(selectedEvent.event.image)} className="w-full h-full object-cover" alt="Banner" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">No Image</div>}                    </div>
                     <h2 className="text-2xl md:text-3xl font-black text-[#1e40af] uppercase leading-tight mb-4">{selectedEvent.event.title}</h2>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -292,8 +291,7 @@ const ParticipantDash = () => {
                                 {selectedEvent.event.speakers.map(s => (
                                     <div key={s.id} className="bg-slate-50 border border-slate-100 p-4 md:p-5 rounded-[1.5rem] flex flex-col sm:flex-row gap-4 items-start">
                                         <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-200 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-blue-500 font-black text-lg md:text-xl">
-                                            {s.photo_path ? <img src={STORAGE_URL + s.photo_path} alt={s.name} className="w-full h-full object-cover" /> : s.name.charAt(0)}
-                                        </div>
+                                        {s.photo_path ? <img src={getImageUrl(s.photo_path)} alt={s.name} className="w-full h-full object-cover" /> : s.name.charAt(0)}                                             </div>
                                         <div className="flex-1">
                                             <div className="flex justify-between items-start mb-1 flex-wrap gap-2">
                                                 <h4 className="font-black text-slate-700 uppercase text-sm md:text-base">{s.name}</h4>

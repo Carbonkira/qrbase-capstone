@@ -6,7 +6,11 @@ const Icon = ({ path, className = "w-6 h-6" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d={path} /></svg>
 );
 
-const STORAGE_URL = "http://localhost:8000/storage/";
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path; 
+  return `https://qrbase.onrender.com/storage/${path}`; 
+};
 
 const Events = () => {
   const navigate = useNavigate();
@@ -258,8 +262,7 @@ const Events = () => {
                       <div key={event.id} className={`p-6 border-2 rounded-[2rem] flex flex-col gap-5 transition-all ${editId === event.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-50'}`}>
                         {/* EVENT IMAGE */}
                         <div className="h-40 w-full bg-slate-100 rounded-2xl overflow-hidden relative shadow-inner">
-                            {event.image ? <img src={STORAGE_URL + event.image} alt="Event Banner" className="w-full h-full object-cover" onError={(e) => {e.target.style.display='none'}} /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-sm uppercase tracking-widest">No Image</div>}
-                        </div>
+{event.image ? <img src={getImageUrl(event.image)} alt="Event Banner" className="w-full h-full object-cover" onError={(e) => {e.target.style.display='none'}} /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-sm uppercase tracking-widest">No Image</div>}                        </div>
 
                         <div className="flex justify-between items-start">
                             <div className="flex flex-col gap-1"><h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{event.title}</h4><span className="text-sm font-bold text-slate-500 uppercase">{event.schedule_date}</span></div>
