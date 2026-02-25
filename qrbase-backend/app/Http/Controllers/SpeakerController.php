@@ -5,20 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Speaker;
 use App\Models\Event;
 use Illuminate\Http\Request;
-// Note: Removed Storage import since we are using Cloudinary now
 
 class SpeakerController extends Controller
 {
-    /**
-     * Get speakers ONLY for the logged-in organizer
-     */
     public function index(Request $request) {
         return Speaker::where('organizer_id', $request->user()->id)->latest()->get();
     }
 
-    /**
-     * Create a new speaker
-     */
     public function store(Request $request) {
         $fields = $request->validate([
             'name' => 'required|string',
@@ -30,7 +23,7 @@ class SpeakerController extends Controller
             'topic' => 'nullable|string' 
         ]);
 
-        // --- CLOUDINARY UPLOAD ---
+        // --- DIRECT CLOUDINARY UPLOAD FIX ---
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $photoPath = cloudinary()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers'])->getSecurePath();
@@ -55,9 +48,6 @@ class SpeakerController extends Controller
         return response()->json(['message' => 'Speaker created!', 'speaker' => $speaker], 201);
     }
 
-    /**
-     * Update an existing speaker (Global + Event Topic)
-     */
     public function update(Request $request, $id) {
         $speaker = Speaker::where('organizer_id', $request->user()->id)->findOrFail($id);
         $fields = $request->validate([
@@ -66,18 +56,15 @@ class SpeakerController extends Controller
             'description' => 'nullable|string',
             'contact_email' => 'nullable|email',
             'photo' => 'nullable|image|max:2048',
-            
-            // Optional: Update topic for a specific event
             'event_id' => 'nullable|exists:events,id',
             'topic' => 'nullable|string'
         ]);
 
-        // --- CLOUDINARY UPLOAD ---
+        // --- DIRECT CLOUDINARY UPLOAD FIX ---
         if ($request->hasFile('photo')) {
             $speaker->photo_path = cloudinary()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers'])->getSecurePath();
         }
 
-        // 1. Update Global Profile
         $speaker->update([
             'name' => $fields['name'],
             'specialization' => $fields['specialization'],
@@ -86,11 +73,9 @@ class SpeakerController extends Controller
             'photo_path' => $speaker->photo_path
         ]);
 
-        // 2. Update Event-Specific Topic (if event_id provided)
         if ($request->filled('event_id')) {
             $event = Event::where('organizer_id', $request->user()->id)->find($request->event_id);
             if ($event) {
-                // Check if attached, if not attach, if yes update pivot
                 if (!$event->speakers()->where('speaker_id', $speaker->id)->exists()) {
                     $event->speakers()->attach($speaker->id, ['topic' => $request->topic ?? 'TBA']);
                 } else {
@@ -104,13 +89,8 @@ class SpeakerController extends Controller
         return response()->json(['message' => 'Speaker updated!', 'speaker' => $speaker]);
     }
 
-    /**
-     * Delete a speaker
-     */
     public function destroy(Request $request, $id) {
         $speaker = Speaker::where('organizer_id', $request->user()->id)->findOrFail($id);
-        
-        // Deleting the speaker automatically removes them from the pivot table (event_speaker)
         $speaker->delete();
 
         return response()->json(['message' => 'Speaker removed']);

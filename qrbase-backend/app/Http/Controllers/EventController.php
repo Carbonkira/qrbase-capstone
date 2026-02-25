@@ -6,7 +6,6 @@ use App\Models\Event;
 use App\Models\Speaker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-// Note: Removed Storage import since we are using Cloudinary now
 
 class EventController extends Controller
 {
@@ -33,7 +32,7 @@ class EventController extends Controller
             'speaker_ids.*' => 'exists:speakers,id'
         ]);
 
-        // --- CLOUDINARY UPLOAD ---
+        // --- DIRECT CLOUDINARY UPLOAD FIX ---
         $imagePath = $request->hasFile('image') 
             ? cloudinary()->upload($request->file('image')->getRealPath(), ['folder' => 'events'])->getSecurePath() 
             : null;
@@ -71,16 +70,13 @@ class EventController extends Controller
             'speaker_ids' => 'nullable|array'
         ]);
 
+        // --- DIRECT CLOUDINARY UPLOAD FIX ---
         if ($request->hasFile('image')) {
             $event->image = cloudinary()->upload($request->file('image')->getRealPath(), ['folder' => 'events'])->getSecurePath();
             $event->save();
         }
 
-        if (array_key_exists('speaker_ids', $fields)) {
-            unset($fields['speaker_ids']);
-        }
-
-        $event->update($fields);
+        $event->update($request->except(['speaker_ids', 'image']));
 
         if ($request->has('speaker_ids')) {
             $event->speakers()->sync($request->speaker_ids);
@@ -95,7 +91,6 @@ class EventController extends Controller
         return response()->json(['message' => 'Event deleted']);
     }
 
-    // --- MODULE DATA (With Custom Statistics) ---
     public function getEventModuleData(Request $request, $id) {
         $event = Event::with(['registrations.user', 'speakers'])
             ->where('organizer_id', $request->user()->id)
@@ -103,7 +98,6 @@ class EventController extends Controller
 
         $form = DB::table('event_feedback_forms')->where('event_id', $id)->first();
 
-        // Bind Feedback to Attendees
         $feedbackResponses = DB::table('feedback_responses')
             ->where('event_id', $id)
             ->get()
@@ -114,17 +108,12 @@ class EventController extends Controller
             $reg->feedback = $response ? json_decode($response->responses, true) : null;
         });
 
-        // FETCH ROSTER
         $allSpeakers = Speaker::where('organizer_id', $request->user()->id)->get();
         
-        // --- STATISTICS CALCULATION ---
-        
-        // 1. Slots Taken (Only Paid or Free)
         $paidOrFreeCount = $event->registrations->filter(function($r) {
             return $r->payment_status === 'Paid' || $r->payment_status === 'Free';
         })->count();
 
-        // 2. Waitlist Capacity (10% of total)
         $waitlistCapacity = floor($event->max_participants * 0.10);
 
         $stats = [
@@ -134,7 +123,7 @@ class EventController extends Controller
             'total_no_show'    => $event->registrations->where('status', 'Absent')->count(),
             'waitlist_count'   => $event->registrations->where('status', 'Waitlisted')->count(),
             'waitlist_cap'     => $waitlistCapacity,
-            'slots_taken'      => $paidOrFreeCount, // Used to calculate "Slots Left"
+            'slots_taken'      => $paidOrFreeCount,
             'feedback_received' => $feedbackResponses->count(),
             'capacity'         => $event->max_participants
         ];
