@@ -62,6 +62,7 @@ class EventController extends Controller
     public function update(Request $request, $id) {
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
 
+        // 1. Validate the incoming data (This safely filters out the '_method' variable)
         $fields = $request->validate([
             'title' => 'sometimes|string',
             'location' => 'sometimes|string',
@@ -71,14 +72,21 @@ class EventController extends Controller
             'speaker_ids' => 'nullable|array'
         ]);
 
-        // --- CLOUDINARY UPLOAD ---
+        // 2. Handle Cloudinary Image Upload
         if ($request->hasFile('image')) {
             $event->image = $request->file('image')->storeOnCloudinary('events')->getSecurePath();
             $event->save();
         }
 
-        $event->update($request->except(['speaker_ids', 'image']));
+        // 3. Remove speaker_ids from the fields so it doesn't crash the events table update
+        if (array_key_exists('speaker_ids', $fields)) {
+            unset($fields['speaker_ids']);
+        }
 
+        // 4. Safely update ONLY the validated fields
+        $event->update($fields);
+
+        // 5. Update the speakers pivot table
         if ($request->has('speaker_ids')) {
             $event->speakers()->sync($request->speaker_ids);
         }
