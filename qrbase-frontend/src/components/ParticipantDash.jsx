@@ -7,7 +7,11 @@ const Icon = ({ path, className = "w-6 h-6" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d={path} /></svg>
 );
 
-const STORAGE_URL = "http://localhost:8000/storage/";
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return `https://qrbase.onrender.com/storage/${path}`;
+};
 
 const ParticipantDash = () => {
   const navigate = useNavigate();
