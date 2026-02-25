@@ -8,7 +8,12 @@ const Icon = ({ path, className = "w-6 h-6" }) => (
   </svg>
 );
 
-const STORAGE_URL = "http://localhost:8000/storage/";
+// --- CLOUDINARY IMAGE HELPER ---
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path; // Uses Cloudinary URL directly
+  return `https://qrbase.onrender.com/storage/${path}`; // Fallback for old local images
+};
 
 const Speakers = () => {
   const navigate = useNavigate();
@@ -229,7 +234,7 @@ const Speakers = () => {
 
             <div className="flex flex-col items-center text-center mt-6">
               <div className="w-48 h-48 bg-slate-100 rounded-full mb-8 overflow-hidden border-4 border-white shadow-lg">
-                {selectedSpeaker.photo_path ? <img src={STORAGE_URL + selectedSpeaker.photo_path} className="w-full h-full object-cover" alt={selectedSpeaker.name} /> : <div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-6xl">{selectedSpeaker.name.charAt(0)}</div>}
+              {selectedSpeaker.photo_path ? <img src={getImageUrl(selectedSpeaker.photo_path)} className="w-full h-full object-cover" alt={selectedSpeaker.name} /> :<div className="w-full h-full flex items-center justify-center text-slate-300 font-black text-6xl">{selectedSpeaker.name.charAt(0)}</div>}
               </div>
               <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tight">{selectedSpeaker.name}</h3>
               <p className="text-sm font-bold text-blue-500 uppercase tracking-widest mb-2">{selectedSpeaker.specialization}</p>
@@ -305,7 +310,8 @@ const Speakers = () => {
                 <div key={s.id} onClick={() => setSelectedSpeaker(s)} className="bg-white p-8 rounded-[3rem] shadow-lg flex gap-6 items-center border-2 border-transparent relative group transition-all hover:-translate-y-2 cursor-pointer hover:border-blue-500/20 active:scale-95">
                   <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} className="absolute top-6 right-6 text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Icon path="M6 18L18 6M6 6l12 12" /></button>
                   <div className="w-20 h-20 bg-slate-100 rounded-full overflow-hidden shrink-0 shadow-inner flex items-center justify-center text-blue-500 font-black text-2xl border-2 border-slate-50">
-                    {s.photo_path ? <img src={STORAGE_URL + s.photo_path} className="w-full h-full object-cover" alt={s.name} /> : s.name.charAt(0)}
+                    {/* FIXED: Swapped STORAGE_URL with getImageUrl(s.photo_path) here */}
+                    {s.photo_path ? <img src={getImageUrl(s.photo_path)} className="w-full h-full object-cover" alt={s.name} /> : s.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xl font-black text-slate-800 truncate uppercase tracking-tight">{s.name}</h4>
