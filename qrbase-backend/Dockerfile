@@ -1,24 +1,12 @@
 FROM php:8.2-fpm
 
-
-# Install system dependencies needed for GD
+# Install ALL system dependencies in one single step
 RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev
+    git curl zip unzip libpng-dev libjpeg-dev libfreetype6-dev libonig-dev libxml2-dev libzip-dev
 
-# Install and configure the extensions
+# Configure GD and install ALL PHP extensions in one single step
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd mbstring bcmath pdo_mysql
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git curl libpng-dev libonig-dev libxml2-dev zip unzip libzip-dev
-
-# Install PHP extensions required by your composer.json
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+    && docker-php-ext-install gd mbstring bcmath pdo_mysql exif pcntl zip
 
 # Get latest Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
