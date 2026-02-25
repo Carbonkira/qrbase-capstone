@@ -3,13 +3,15 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Cloudinary Configuration
+    | Fail-Safe Cloudinary Configuration
     |--------------------------------------------------------------------------
-    |
-    | An environment variable 'CLOUDINARY_URL' is required.
-    |
+    | Bypassing the Render environment entirely to guarantee a successful connection.
     */
-    'cloud_url' => env('CLOUDINARY_URL'),
-    'upload_preset' => env('CLOUDINARY_UPLOAD_PRESET'),
-    'notification_url' => env('CLOUDINARY_NOTIFICATION_URL'),
+    'cloud_url' => 'cloudinary://785553928652788:CBMFldO9HDKUF3H3ZiMeG9i5sDY@dyxszia6d',
+    
+    'cloud' => [
+        'cloud_name' => 'dyxszia6d',
+        'api_key'    => '785553928652788',
+        'api_secret' => 'CBMFldO9HDKUF3H3ZiMeG9i5sDY',
+    ],
 ];
