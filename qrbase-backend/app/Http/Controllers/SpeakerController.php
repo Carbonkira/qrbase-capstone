@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Speaker;
 use App\Models\Event;
 use Illuminate\Http\Request;
+use Cloudinary\Cloudinary; // <-- IMPORT NATIVE SDK
 
 class SpeakerController extends Controller
 {
@@ -23,10 +24,12 @@ class SpeakerController extends Controller
             'topic' => 'nullable|string' 
         ]);
 
-        // --- DIRECT CLOUDINARY UPLOAD FIX ---
+        // --- THE ULTIMATE BYPASS ---
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = cloudinary()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers'])->getSecurePath();
+            $cloudinary = new Cloudinary('cloudinary://785553928652788:CBMFldO9HDKUF3H3ZiMeG9i5sDY@dyxszia6d');
+            $upload = $cloudinary->uploadApi()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers']);
+            $photoPath = $upload['secure_url'];
         }
 
         $speaker = Speaker::create([
@@ -60,9 +63,11 @@ class SpeakerController extends Controller
             'topic' => 'nullable|string'
         ]);
 
-        // --- DIRECT CLOUDINARY UPLOAD FIX ---
+        // --- THE ULTIMATE BYPASS ---
         if ($request->hasFile('photo')) {
-            $speaker->photo_path = cloudinary()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers'])->getSecurePath();
+            $cloudinary = new Cloudinary('cloudinary://785553928652788:CBMFldO9HDKUF3H3ZiMeG9i5sDY@dyxszia6d');
+            $upload = $cloudinary->uploadApi()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers']);
+            $speaker->photo_path = $upload['secure_url'];
         }
 
         $speaker->update([

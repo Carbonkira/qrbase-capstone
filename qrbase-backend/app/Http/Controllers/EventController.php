@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Speaker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Cloudinary\Cloudinary; // <-- IMPORT NATIVE SDK
 
 class EventController extends Controller
 {
@@ -32,10 +33,13 @@ class EventController extends Controller
             'speaker_ids.*' => 'exists:speakers,id'
         ]);
 
-        // --- DIRECT CLOUDINARY UPLOAD FIX ---
-        $imagePath = $request->hasFile('image') 
-            ? cloudinary()->upload($request->file('image')->getRealPath(), ['folder' => 'events'])->getSecurePath() 
-            : null;
+        // --- THE ULTIMATE BYPASS ---
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $cloudinary = new Cloudinary('cloudinary://785553928652788:CBMFldO9HDKUF3H3ZiMeG9i5sDY@dyxszia6d');
+            $upload = $cloudinary->uploadApi()->upload($request->file('image')->getRealPath(), ['folder' => 'events']);
+            $imagePath = $upload['secure_url'];
+        }
 
         $inviteCode = strtoupper(\Illuminate\Support\Str::random(6));
 
@@ -70,9 +74,11 @@ class EventController extends Controller
             'speaker_ids' => 'nullable|array'
         ]);
 
-        // --- DIRECT CLOUDINARY UPLOAD FIX ---
+        // --- THE ULTIMATE BYPASS ---
         if ($request->hasFile('image')) {
-            $event->image = cloudinary()->upload($request->file('image')->getRealPath(), ['folder' => 'events'])->getSecurePath();
+            $cloudinary = new Cloudinary('cloudinary://785553928652788:CBMFldO9HDKUF3H3ZiMeG9i5sDY@dyxszia6d');
+            $upload = $cloudinary->uploadApi()->upload($request->file('image')->getRealPath(), ['folder' => 'events']);
+            $event->image = $upload['secure_url'];
             $event->save();
         }
 
