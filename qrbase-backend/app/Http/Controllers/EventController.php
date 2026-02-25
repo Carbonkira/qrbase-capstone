@@ -35,7 +35,7 @@ class EventController extends Controller
 
         // --- CLOUDINARY UPLOAD ---
         $imagePath = $request->hasFile('image') 
-            ? $request->file('image')->storeOnCloudinary('events')->getSecurePath() 
+            ? cloudinary()->upload($request->file('image')->getRealPath(), ['folder' => 'events'])->getSecurePath() 
             : null;
 
         $inviteCode = strtoupper(\Illuminate\Support\Str::random(6));
@@ -62,7 +62,6 @@ class EventController extends Controller
     public function update(Request $request, $id) {
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
 
-        // 1. Validate the incoming data (This safely filters out the '_method' variable)
         $fields = $request->validate([
             'title' => 'sometimes|string',
             'location' => 'sometimes|string',
@@ -72,21 +71,17 @@ class EventController extends Controller
             'speaker_ids' => 'nullable|array'
         ]);
 
-        // 2. Handle Cloudinary Image Upload
         if ($request->hasFile('image')) {
-            $event->image = $request->file('image')->storeOnCloudinary('events')->getSecurePath();
+            $event->image = cloudinary()->upload($request->file('image')->getRealPath(), ['folder' => 'events'])->getSecurePath();
             $event->save();
         }
 
-        // 3. Remove speaker_ids from the fields so it doesn't crash the events table update
         if (array_key_exists('speaker_ids', $fields)) {
             unset($fields['speaker_ids']);
         }
 
-        // 4. Safely update ONLY the validated fields
         $event->update($fields);
 
-        // 5. Update the speakers pivot table
         if ($request->has('speaker_ids')) {
             $event->speakers()->sync($request->speaker_ids);
         }

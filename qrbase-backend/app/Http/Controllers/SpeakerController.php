@@ -33,7 +33,7 @@ class SpeakerController extends Controller
         // --- CLOUDINARY UPLOAD ---
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->storeOnCloudinary('speakers')->getSecurePath();
+            $photoPath = cloudinary()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers'])->getSecurePath();
         }
 
         $speaker = Speaker::create([
@@ -74,7 +74,7 @@ class SpeakerController extends Controller
 
         // --- CLOUDINARY UPLOAD ---
         if ($request->hasFile('photo')) {
-            $speaker->photo_path = $request->file('photo')->storeOnCloudinary('speakers')->getSecurePath();
+            $speaker->photo_path = cloudinary()->upload($request->file('photo')->getRealPath(), ['folder' => 'speakers'])->getSecurePath();
         }
 
         // 1. Update Global Profile
