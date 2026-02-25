@@ -21,4 +21,4 @@ RUN composer install --no-dev --optimize-autoloader
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 # Expose the port Render provides
-CMD php artisan serve --host=0.0.0.0 --port=$PORT
+CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT
