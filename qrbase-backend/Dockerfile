@@ -20,5 +20,5 @@ RUN composer install --no-dev --optimize-autoloader
 # Set permissions for Laravel storage
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Run migrations and start the server
-CMD php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT
+# Run storage:link, migrations, and start the server
+CMD php artisan storage:link && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT
