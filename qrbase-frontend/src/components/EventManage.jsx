@@ -12,6 +12,7 @@ const getImageUrl = (path) => {
   if (path.startsWith('http')) return path; // Uses Cloudinary URL directly
   return `https://qrbase.onrender.com/storage/${path}`; // Fallback for old local images
 };
+
 const EventManage = () => {
   const { id } = useParams(); 
   const navigate = useNavigate();
