@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Speaker;
 use App\Models\Event;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+// Note: Removed Storage import since we are using Cloudinary now
 
 class SpeakerController extends Controller
 {
@@ -30,9 +30,10 @@ class SpeakerController extends Controller
             'topic' => 'nullable|string' 
         ]);
 
+        // --- CLOUDINARY UPLOAD ---
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('speakers', 'public');
+            $photoPath = $request->file('photo')->storeOnCloudinary('speakers')->getSecurePath();
         }
 
         $speaker = Speaker::create([
@@ -71,9 +72,9 @@ class SpeakerController extends Controller
             'topic' => 'nullable|string'
         ]);
 
+        // --- CLOUDINARY UPLOAD ---
         if ($request->hasFile('photo')) {
-            if ($speaker->photo_path) Storage::disk('public')->delete($speaker->photo_path);
-            $speaker->photo_path = $request->file('photo')->store('speakers', 'public');
+            $speaker->photo_path = $request->file('photo')->storeOnCloudinary('speakers')->getSecurePath();
         }
 
         // 1. Update Global Profile
@@ -108,8 +109,7 @@ class SpeakerController extends Controller
      */
     public function destroy(Request $request, $id) {
         $speaker = Speaker::where('organizer_id', $request->user()->id)->findOrFail($id);
-
-        if ($speaker->photo_path) Storage::disk('public')->delete($speaker->photo_path);
+        
         // Deleting the speaker automatically removes them from the pivot table (event_speaker)
         $speaker->delete();
 

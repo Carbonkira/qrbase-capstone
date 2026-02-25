@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Speaker;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+// Note: Removed Storage import since we are using Cloudinary now
 
 class EventController extends Controller
 {
@@ -33,8 +33,9 @@ class EventController extends Controller
             'speaker_ids.*' => 'exists:speakers,id'
         ]);
 
+        // --- CLOUDINARY UPLOAD ---
         $imagePath = $request->hasFile('image') 
-            ? $request->file('image')->store('events', 'public') 
+            ? $request->file('image')->storeOnCloudinary('events')->getSecurePath() 
             : null;
 
         $inviteCode = strtoupper(\Illuminate\Support\Str::random(6));
@@ -70,9 +71,9 @@ class EventController extends Controller
             'speaker_ids' => 'nullable|array'
         ]);
 
+        // --- CLOUDINARY UPLOAD ---
         if ($request->hasFile('image')) {
-            if ($event->image) Storage::disk('public')->delete($event->image);
-            $event->image = $request->file('image')->store('events', 'public');
+            $event->image = $request->file('image')->storeOnCloudinary('events')->getSecurePath();
             $event->save();
         }
 
@@ -87,8 +88,6 @@ class EventController extends Controller
 
     public function destroy(Request $request, $id) {
         $event = Event::where('organizer_id', $request->user()->id)->findOrFail($id);
-        
-        if ($event->image) Storage::disk('public')->delete($event->image);
         $event->delete();
         return response()->json(['message' => 'Event deleted']);
     }
